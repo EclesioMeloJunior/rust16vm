@@ -1,4 +1,4 @@
-use std::usize;
+use std::char::REPLACEMENT_CHARACTER;
 
 #[allow(dead_code)]
 use super::memory::Addressable;
@@ -13,6 +13,9 @@ pub enum Register {
     SP,
     PC,
     BP,
+
+    // bit 0 - if set to 1 halts the machine
+    // bit 1 - if set to 1 stores division module on stack
     FLAGS,
 }
 
@@ -50,8 +53,19 @@ impl TryFrom<usize> for Register {
 }
 
 #[derive(Debug)]
+pub enum ArithmeticOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+/// set of possible instructions
+/// MOV - Move immediate to register
+/// MSL | MSR - Move immediate to register shifting register value
+/// ADD | SUB | MUL | Div - Arithmetic Operations
+#[derive(Debug)]
 pub enum Instruction {
-    // Move immediate to register
     // Format: 0001 | reg(3) | immediate(9)
     Mov(Register, u16),
 
@@ -60,7 +74,10 @@ pub enum Instruction {
     // direction 1 then shift left
     // direction 0 then shift right
     MovShift(Register, u8, bool, u16),
-    // Add more instructions here...
+
+    // Executes one of the arithmetic operations (add, sub, mul, div)
+    // Format: 0011 | reg(3) | op(2) | src(1) | [src == 1]reg(3),[src == 0]imm(6)
+    Arith(Register, Option<Register>, Option<u16>, ArithmeticOp),
 }
 
 impl TryFrom<u16> for Instruction {
@@ -86,55 +103,31 @@ impl TryFrom<u16> for Instruction {
                     imm,
                 ));
             }
-            _ => Err(format!("Unexpected instruction: {:#06x}", inst)),
+            0b0011 => {
+                let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
+                let op = match (inst >> 7) & 0b11 {
+                    0b00 => ArithmeticOp::Add,
+                    0b01 => ArithmeticOp::Sub,
+                    0b10 => ArithmeticOp::Mul,
+                    0b11 => ArithmeticOp::Div,
+                    _ => unreachable!(),
+                };
+
+                let uses_reg_as_input = (inst >> 9) & 0b1 == 1;
+
+                if uses_reg_as_input {
+                    let reg_src = Register::try_from(((inst >> 10) & 0b111) as usize)?;
+                    return Ok(Instruction::Arith(reg_dst, Some(reg_src), None, op));
+                }
+
+                let imm = inst >> 10;
+                Ok(Instruction::Arith(reg_dst, None, Some(imm), op))
+            }
+            _ => Err(format!("unexpected instruction: {:#06x}", inst)),
         }
     }
 }
 
-impl Instruction {
-    pub fn from_u16(inst: u16) -> Result<Self, String> {
-        let opcode = inst & 0b1111;
-
-        match opcode {
-            0b0001 => {
-                let reg_idx = ((inst >> 4) & 0b111) as usize;
-                let reg = match reg_idx {
-                    0 => Register::A,
-                    1 => Register::B,
-                    2 => Register::C,
-                    3 => Register::M,
-                    4 => Register::SP,
-                    5 => Register::PC,
-                    6 => Register::BP,
-                    7 => Register::FLAGS,
-                    _ => return Err(format!("Invalid register index: {}", reg_idx)),
-                };
-                let imm = (inst >> 7) & 0b111111111;
-                Ok(Instruction::Mov(reg, imm))
-            }
-            0b0010 => {
-                let reg_idx = ((inst >> 4) & 0b111) as usize;
-                let reg = match reg_idx {
-                    0 => Register::A,
-                    1 => Register::B,
-                    2 => Register::C,
-                    3 => Register::M,
-                    4 => Register::SP,
-                    5 => Register::PC,
-                    6 => Register::BP,
-                    7 => Register::FLAGS,
-                    _ => return Err(format!("Invalid register index: {}", reg_idx)),
-                };
-                let shift_amt = ((inst >> 7) & 0b111) as u8;
-                let direction = ((inst >> 10) & 0b1) == 1; // true = left, false = right
-                let imm = (inst >> 11) & 0b11111;
-                Ok(Instruction::MovShift(reg, shift_amt, direction, imm))
-            }
-            // Add more opcodes here
-            _ => Err(format!("Unexpected instruction: {:#06x}", inst)),
-        }
-    }
-}
 pub struct Machine<M: Addressable> {
     registers: [u16; 8],
     memory: M,
@@ -149,6 +142,11 @@ impl<M: Addressable> Machine<M> {
     }
 
     pub fn step(&mut self) -> Result<(), String> {
+        let halt = self.registers[Register::FLAGS as usize] & 0b1 == 1;
+        if halt {
+            return Ok(());
+        }
+
         let pc = self.registers[Register::PC as usize];
         let raw = self.memory.read2(pc).unwrap();
 
@@ -158,22 +156,49 @@ impl<M: Addressable> Machine<M> {
         match inst {
             Instruction::Mov(dst_reg, imm) => {
                 self.registers[dst_reg as usize] = imm;
-            },
+            }
             Instruction::MovShift(dst_reg, sh_am, left, imm) => {
                 let mut curr_value = self.registers[dst_reg as usize];
                 if left {
-                    curr_value <<=sh_am;
+                    curr_value <<= sh_am;
                 } else {
                     curr_value >>= sh_am;
                 }
 
                 curr_value |= imm;
                 self.registers[dst_reg as usize] = curr_value;
+            }
+            Instruction::Arith(dst_reg, src_reg, imm, arith_op) => match (src_reg, imm) {
+                (Some(src), None) => {
+                    self.arithmetic_op(dst_reg, self.registers[src as usize], arith_op)
+                }
+                (None, Some(imm)) => self.arithmetic_op(dst_reg, imm, arith_op),
+                _ => unreachable!(),
             },
         }
 
         self.registers[Register::PC as usize] += 2;
         Ok(())
+    }
+
+    fn arithmetic_op(&mut self, dst_reg: Register, imm: u16, op: ArithmeticOp) {
+        let lhs = self.registers[dst_reg as usize];
+        let result = match op {
+            ArithmeticOp::Add => lhs + imm,
+            ArithmeticOp::Sub => lhs - imm,
+            ArithmeticOp::Mul => lhs * imm,
+            ArithmeticOp::Div => {
+                let store_mod = (self.registers[Register::FLAGS as usize] >> 1) & 0b1 == 1;
+                if store_mod {
+                    self.memory
+                        .write2(self.registers[Register::SP as usize], lhs % imm);
+                    self.registers[Register::SP as usize] += 2;
+                }
+                lhs / imm
+            }
+        };
+
+        self.registers[dst_reg as usize] = result;
     }
 
     pub fn print_regs(&self) -> () {
@@ -186,5 +211,89 @@ impl<M: Addressable> Machine<M> {
                 value
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        machine::{self, Register},
+        memory::{Addressable, LinearMemory},
+    };
+
+    use super::Machine;
+
+    #[test]
+    fn invalid_instruction_opcode() {
+        let mut mem = LinearMemory::new(1024);
+        mem.write2(0, 0 as u16);
+        let mut machine = Machine::new(mem);
+
+        let result = machine.step();
+        assert!(result.is_err());
+        assert_eq!(Err(String::from("unexpected instruction: 0x0000")), result);
+    }
+
+    #[test]
+    fn valid_mov_instruction() {
+        let mut mem = LinearMemory::new(8 * 1024); //8Kb
+        // 3 instructions to fill a register with ones
+        mem.write2(0, 0b1111111110000001); // MOV A, #8
+        mem.write2(2, 0b1111111010000010); // MSL A, 5 #31
+        mem.write2(4, 0b0001110100000010); // MSL A, 2 #3
+
+        let mut machine = Machine::new(mem);
+        for _i in 0..3 {
+            machine.step().unwrap();
+        }
+
+        assert_eq!(machine.registers[Register::A as usize], u16::MAX);
+    }
+
+    #[test]
+    fn arithmetic_instruction() {
+        let default_mem = || {
+            let mut mem = LinearMemory::new(8 * 1024); //8Kb
+            mem.write2(0, 0b0000010000000001); // MOV A, #8
+            mem
+        };
+
+        // run adds number 8 to register A
+        let run = move |instrs: Vec<u16>, expected: u16| {
+            let mut mem = default_mem();
+            let inst_len = instrs.len();
+
+            for (idx, inst) in instrs.iter().enumerate() {
+                assert!(mem.write2(((idx + 1) * 2) as u16, *inst));
+            }
+
+            let mut machine = Machine::new(mem);
+            for i in 0..inst_len + 1 {
+                machine.step().unwrap();
+            }
+
+            assert_eq!(machine.registers[Register::A as usize], expected);
+        };
+
+        // ADD A, #2
+        run(vec![0b0000100000000011], 10);
+
+        // MOV B, #2
+        // ADD A, B
+        run(vec![0b000000010_001_0001, 0b000_001_1_00_000_0011], 10);
+
+        // SUB A, #2
+        run(vec![0b000010_0_01_000_0011], 6);
+
+        // MOV B, #2
+        // SUB A, B
+        run(vec![0b000000010_001_0001, 0b000_001_1_01_000_0011], 6);
+
+        // MUL A, #2
+        run(vec![0b000010_0_10_000_0011], 16);
+
+        // MOV B, #2
+        // MUL A, B
+        run(vec![0b000000010_001_0001, 0b000_001_1_10_000_0011], 16);
     }
 }
