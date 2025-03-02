@@ -216,6 +216,8 @@ impl<M: Addressable> Machine<M> {
 
 #[cfg(test)]
 mod test {
+    use std::usize;
+
     use crate::{
         machine::{self, Register},
         memory::{Addressable, LinearMemory},
@@ -259,41 +261,94 @@ mod test {
         };
 
         // run adds number 8 to register A
-        let run = move |instrs: Vec<u16>, expected: u16| {
-            let mut mem = default_mem();
-            let inst_len = instrs.len();
+        let run =
+            move |instrs: Vec<u16>, assertions: Vec<(Register, u16)>| -> Machine<LinearMemory> {
+                let mut mem = default_mem();
+                let inst_len = instrs.len();
 
-            for (idx, inst) in instrs.iter().enumerate() {
-                assert!(mem.write2(((idx + 1) * 2) as u16, *inst));
-            }
+                for (idx, inst) in instrs.iter().enumerate() {
+                    assert!(mem.write2(((idx + 1) * 2) as u16, *inst));
+                }
 
-            let mut machine = Machine::new(mem);
-            for i in 0..inst_len + 1 {
-                machine.step().unwrap();
-            }
+                let mut machine = Machine::new(mem);
+                for i in 0..inst_len + 1 {
+                    machine.step().unwrap();
+                }
 
-            assert_eq!(machine.registers[Register::A as usize], expected);
-        };
+                for (reg, exp) in assertions {
+                    assert_eq!(machine.registers[reg as usize], exp);
+                }
+
+                machine
+            };
 
         // ADD A, #2
-        run(vec![0b0000100000000011], 10);
+        run(vec![0b0000100000000011], vec![(Register::A, 10)]);
 
         // MOV B, #2
         // ADD A, B
-        run(vec![0b000000010_001_0001, 0b000_001_1_00_000_0011], 10);
+        run(
+            vec![0b000000010_001_0001, 0b000_001_1_00_000_0011],
+            vec![(Register::A, 10)],
+        );
 
         // SUB A, #2
-        run(vec![0b000010_0_01_000_0011], 6);
+        run(vec![0b000010_0_01_000_0011], vec![(Register::A, 6)]);
 
         // MOV B, #2
         // SUB A, B
-        run(vec![0b000000010_001_0001, 0b000_001_1_01_000_0011], 6);
+        run(
+            vec![0b000000010_001_0001, 0b000_001_1_01_000_0011],
+            vec![(Register::A, 6)],
+        );
 
         // MUL A, #2
-        run(vec![0b000010_0_10_000_0011], 16);
+        run(vec![0b000010_0_10_000_0011], vec![(Register::A, 16)]);
 
         // MOV B, #2
         // MUL A, B
-        run(vec![0b000000010_001_0001, 0b000_001_1_10_000_0011], 16);
+        run(
+            vec![0b000000010_001_0001, 0b000_001_1_10_000_0011],
+            vec![(Register::A, 16)],
+        );
+
+        // DIV A, #2 - no FLAGS
+        run(vec![0b000010_0_11_000_0011], vec![(Register::A, 4)]);
+
+        // MOV FL, #2
+        // DIV A, #5 - with FLAGS
+        let machine = run(
+            vec![0b000000010_111_0001, 0b000101_0_11_000_0011],
+            vec![(Register::A, 1)],
+        );
+        let stored = machine
+            .memory
+            .read2(machine.registers[Register::SP as usize] - 2_u16);
+
+        assert_eq!(stored.unwrap(), 3_u16);
+
+        // MOV B, #2
+        // DIV A, B - no FLAGS
+        run(
+            vec![0b000000010_001_0001, 0b000_001_1_11_000_0011],
+            vec![(Register::A, 4)],
+        );
+
+        // MOV FL, #2
+        // MOV B, #2
+        // DIV A, B - with FLAGS
+        let machine = run(
+            vec![
+                0b000000010_111_0001,
+                0b000000101_001_0001,
+                0b000_001_1_11_000_0011,
+            ],
+            vec![(Register::A, 1)],
+        );
+        let stored = machine
+            .memory
+            .read2(machine.registers[Register::SP as usize] - 2_u16);
+
+        assert_eq!(stored.unwrap(), 3_u16);
     }
 }
