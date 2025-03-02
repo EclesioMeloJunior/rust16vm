@@ -7,4 +7,5 @@ edition = "2024"
 
 [[bin]]
 name = "vm"
+path = "./bin/vm.rs"
 
