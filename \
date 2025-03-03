@@ -1,4 +1,4 @@
-use std::{ops::ShlAssign, usize};
+use std::{char::REPLACEMENT_CHARACTER, usize};
 
 #[allow(dead_code)]
 use super::memory::Addressable;
@@ -16,7 +16,6 @@ pub enum Register {
 
     // bit 0 - if set to 1 halts the machine
     // bit 1 - if set to 1 stores division module on stack
-    // bit 2 - if set to 1 failed to perform memory write
     FLAGS,
 }
 
@@ -65,11 +64,11 @@ pub enum ArithmeticOp {
 /// MOV - Move immediate to register
 /// MSL | MSR - Move immediate to register shifting register value
 /// ADD | SUB | MUL | Div - Arithmetic Operations
-/// LDR | STR - operations on the memory
 #[derive(Debug)]
 pub enum Instruction {
     // Format: 0001 | reg(3) | immediate(9)
     Mov(Register, u16),
+
     // Move with shift
     // Format: 0010 | reg(3) | shift_amt(3) | direction(1) | immediate(5)
     // direction 1 then shift left
@@ -83,7 +82,7 @@ pub enum Instruction {
 
     // Load or Store the register value in the memory
     // Format: 0100 | reg(3) | reg(3) | type (1) | shift (5)
-    LdrStr(Register, Register, bool, u8),
+    LdrStr(Register, Register, bool, u16),
 }
 
 impl TryFrom<u16> for Instruction {
@@ -130,11 +129,7 @@ impl TryFrom<u16> for Instruction {
                 Ok(Instruction::Arith(reg_dst, None, Some(imm), op))
             }
             0b0100 => {
-                let r0 = Register::try_from(((inst >> 4) & 0b111) as usize)?;
-                let addr_reg = Register::try_from(((inst >> 7) & 0b111) as usize)?;
-                let is_str = (inst >> 10) & 0b1 == 1;
-                let shift = (inst >> 11) as u8;
-                Ok(Instruction::LdrStr(r0, addr_reg, is_str, shift))
+                let r0 = Register::try_from((inst >> 4) & 0b111) as usize)?;
             }
             _ => Err(format!("unexpected instruction: {:#06x}", inst)),
         }
@@ -188,32 +183,10 @@ impl<M: Addressable> Machine<M> {
                 (None, Some(imm)) => self.arithmetic_op(dst_reg, imm, arith_op),
                 _ => unreachable!(),
             },
-            Instruction::LdrStr(r0, addr_reg, is_str, shift) => {
-                let base = self.registers[addr_reg as usize];
-                let at = base + (shift as u16);
-
-                if is_str {
-                    let to_store = self.registers[r0 as usize];
-                    if !self.memory.write2(at, to_store) {
-                        // failed to perform memory write
-                        // force a halt
-                        // 0b0...101
-                        self.set_flags((0b1 << 2) | 0b1);
-                    }
-                } else {
-                    if let Some(value) = self.memory.read2(at) {
-                        self.registers[r0 as usize] = value;
-                    }
-                }
-            }
         }
 
         self.registers[Register::PC as usize] += 2;
         Ok(())
-    }
-
-    fn set_flags(&mut self, flags: u16) {
-        self.registers[Register::FLAGS as usize] |= flags;
     }
 
     fn arithmetic_op(&mut self, dst_reg: Register, imm: u16, op: ArithmeticOp) {
