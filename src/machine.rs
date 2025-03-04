@@ -1,5 +1,3 @@
-use std::{ops::ShlAssign, usize};
-
 #[allow(dead_code)]
 use super::memory::Addressable;
 
@@ -53,7 +51,7 @@ impl TryFrom<usize> for Register {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum ArithmeticOp {
     Add,
     Sub,
@@ -66,7 +64,7 @@ pub enum ArithmeticOp {
 /// MSL | MSR - Move immediate to register shifting register value
 /// ADD | SUB | MUL | Div - Arithmetic Operations
 /// LDR | STR - operations on the memory
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Instruction {
     // Format: 0001 | reg(3) | immediate(9)
     Mov(Register, u16),
@@ -254,7 +252,7 @@ mod test {
     use std::usize;
 
     use crate::{
-        machine::{self, Register},
+        machine::Register,
         memory::{Addressable, LinearMemory},
     };
 
@@ -306,7 +304,7 @@ mod test {
                 }
 
                 let mut machine = Machine::new(mem);
-                for i in 0..inst_len + 1 {
+                for _i in 0..inst_len + 1 {
                     machine.step().unwrap();
                 }
 
