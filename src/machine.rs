@@ -15,6 +15,9 @@ pub enum Register {
     // bit 0 - if set to 1 halts the machine
     // bit 1 - if set to 1 stores division module on stack
     // bit 2 - if set to 1 failed to perform memory write
+    // bit 3 - if set to 1 then
+    // [not eq|eq|less|less_eq|greater|greater_eq]
+    // instruction is true
     FLAGS,
 }
 
@@ -51,12 +54,38 @@ impl TryFrom<usize> for Register {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum ArithmeticOp {
     Add,
     Sub,
     Mul,
     Div,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub enum CompareOp {
+    Eq,        // 000
+    NotEq,     // 001
+    Less,      // 010
+    LessEq,    // 011
+    Greater,   // 100
+    GreaterEq, // 101
+}
+
+impl TryFrom<usize> for CompareOp {
+    type Error = String;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(CompareOp::Eq),
+            1 => Ok(CompareOp::NotEq),
+            2 => Ok(CompareOp::Less),
+            3 => Ok(CompareOp::LessEq),
+            4 => Ok(CompareOp::Greater),
+            5 => Ok(CompareOp::GreaterEq),
+            _ => Err(format!("invalid compare opcode: {}", value)),
+        }
+    }
 }
 
 /// set of possible instructions
@@ -82,6 +111,19 @@ pub enum Instruction {
     // Load or Store the register value in the memory
     // Format: 0100 | reg(3) | reg(3) | type (1) | shift (5)
     LdrStr(Register, Register, bool, u8),
+
+    // Set the PC to a specific memory address
+    // Format: 0110 | mode (1) | [mode == 1]reg(3) | [mode == 0]imm(11)
+    Jmp(Option<Register>, Option<u16>),
+
+    // Reads FLAGS register at bit 3 and it its 1 then
+    // sets PC register to the given memory address
+    // Format: 0101 | mode (1) | [mode == 1]reg(3) | [mode == 0]imm(11)
+    CondJmp(Option<Register>, Option<u16>),
+
+    // Compare a base register with another register or with an immediate
+    // Foarmat: 0111 | reg (3) | cmp (3) | mode (1) | [mode == 1] reg(3), [mode == 0]imm(5)
+    Cmp(Register, Option<Register>, Option<u16>, CompareOp),
 }
 
 impl TryFrom<u16> for Instruction {
@@ -134,6 +176,45 @@ impl TryFrom<u16> for Instruction {
                 let shift = (inst >> 11) as u8;
                 Ok(Instruction::LdrStr(r0, addr_reg, is_str, shift))
             }
+            0b0110 => {
+                let is_reg_mode = (inst >> 4) & 0b1 == 1;
+                if is_reg_mode {
+                    let reg = Register::try_from(((inst >> 5) & 0b111) as usize)?;
+                    return Ok(Instruction::Jmp(Some(reg), None));
+                }
+
+                let imm = (inst >> 5) & 0b11111111111;
+                Ok(Instruction::Jmp(None, Some(imm)))
+            }
+            0b0101 => {
+                let is_reg_mode = (inst >> 4) & 0b1 == 1;
+                if is_reg_mode {
+                    let reg = Register::try_from(((inst >> 5) & 0b111) as usize)?;
+                    return Ok(Instruction::Jmp(Some(reg), None));
+                }
+
+                let imm = (inst >> 5) & 0b11111111111;
+                Ok(Instruction::CondJmp(None, Some(imm)))
+            }
+            0b0111 => {
+                let reg = Register::try_from(((inst >> 4) & 0b111) as usize)?;
+                let cmp = ((inst >> 7) & 0b111) as usize;
+                let reg_mode = (inst >> 10) & 0b1 == 1;
+                let (opt_reg, opt_imm) = if reg_mode {
+                    let src_reg = Register::try_from(((inst >> 11) & 0b111) as usize)?;
+                    (Some(src_reg), None)
+                } else {
+                    let imm = (inst >> 11) & 0b11111;
+                    (None, Some(imm))
+                };
+
+                Ok(Instruction::Cmp(
+                    reg,
+                    opt_reg,
+                    opt_imm,
+                    CompareOp::try_from(cmp)?,
+                ))
+            }
             _ => Err(format!("unexpected instruction: {:#06x}", inst)),
         }
     }
@@ -155,7 +236,7 @@ impl<M: Addressable> Machine<M> {
     pub fn step(&mut self) -> Result<(), String> {
         let halt = self.registers[Register::FLAGS as usize] & 0b1 == 1;
         if halt {
-            return Ok(());
+            return Err(format!("machine halted!"));
         }
 
         let pc = self.registers[Register::PC as usize];
@@ -204,6 +285,50 @@ impl<M: Addressable> Machine<M> {
                     }
                 }
             }
+            Instruction::Jmp(opt_reg, opt_imm) => match (opt_reg, opt_imm) {
+                (Some(reg), None) => {
+                    let addr = self.registers[reg as usize];
+                    self.registers[Register::PC as usize] = addr;
+                    return Ok(());
+                }
+                (None, Some(imm)) => {
+                    self.registers[Register::PC as usize] = imm;
+                    return Ok(());
+                }
+                _ => unreachable!(),
+            },
+            Instruction::CondJmp(opt_reg, opt_imm) => {
+                let curr_flags = self.registers[Register::FLAGS as usize];
+                let should_jmp = (curr_flags >> 3) & 0b1 == 1;
+                if should_jmp {
+                    // switch back the bit to 0 after reading it
+                    self.registers[Register::FLAGS as usize] ^= 1 << 3;
+
+                    match (opt_reg, opt_imm) {
+                        (Some(reg), None) => {
+                            let addr = self.registers[reg as usize];
+                            self.registers[Register::PC as usize] = addr;
+                            return Ok(());
+                        }
+                        (None, Some(imm)) => {
+                            self.registers[Register::PC as usize] = imm;
+                            return Ok(());
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+            }
+            Instruction::Cmp(reg, opt_reg, opt_imm, op) => {
+                let lhs = self.registers[reg as usize];
+                match (opt_reg, opt_imm) {
+                    (Some(other_reg), None) => {
+                        self.compare_op(lhs, self.registers[other_reg as usize], op)
+                    }
+                    (None, Some(imm)) => self.compare_op(lhs, imm, op),
+                    _ => unreachable!(),
+                };
+            }
+            _ => return Err(format!("invalid instruction: {:?}", inst)),
         }
 
         self.registers[Register::PC as usize] += 2;
@@ -234,6 +359,21 @@ impl<M: Addressable> Machine<M> {
         self.registers[dst_reg as usize] = result;
     }
 
+    fn compare_op(&mut self, lhs: u16, rhs: u16, op: CompareOp) {
+        let is_true = match op {
+            CompareOp::Eq => lhs == rhs,
+            CompareOp::NotEq => lhs != rhs,
+            CompareOp::Less => lhs < rhs,
+            CompareOp::LessEq => lhs <= rhs,
+            CompareOp::Greater => lhs > rhs,
+            CompareOp::GreaterEq => lhs >= rhs,
+        };
+
+        if is_true {
+            self.set_flags(1 << 3);
+        }
+    }
+
     pub fn print_regs(&self) -> () {
         for (idx, value) in self.registers.iter().enumerate() {
             println!(
@@ -254,6 +394,7 @@ mod test {
     use crate::{
         machine::Register,
         memory::{Addressable, LinearMemory},
+        rv16asm,
     };
 
     use super::Machine;
@@ -383,5 +524,51 @@ mod test {
             .read2(machine.registers[Register::SP as usize] - 2_u16);
 
         assert_eq!(stored.unwrap(), 3_u16);
+    }
+
+    #[test]
+    fn test_jump_instruction() {
+        let mut mem = LinearMemory::new(1024);
+        mem.write2(0, 0b00000001010_0_0110); // JMP #10
+        mem.write2(10, 0b0000010000000001); // MOV A, #8
+
+        let mut machine = Machine::new(mem);
+        machine.print_regs();
+        machine.step().unwrap();
+        assert_eq!(machine.registers[Register::PC as usize], 10);
+
+        machine.print_regs();
+        machine.step().unwrap();
+        machine.print_regs();
+
+        assert_eq!(machine.registers[Register::A as usize], 8);
+        assert_eq!(machine.registers[Register::PC as usize], 12);
+    }
+
+    #[test]
+    fn a_simple_for_loop() {
+        let program = rv16asm! {
+            "MOV A, #0",
+
+            // loop
+            "EQ A, #10",
+            "CJP #10",
+            "ADD A, #1",
+            "JMP #2",
+
+            "ADD FLAGS, #1" // halts machine
+        };
+
+        let mut mem = LinearMemory::new(1024);
+
+        for (idx, inst) in program.iter().enumerate() {
+            assert!(mem.write2((idx * 2) as u16, *inst));
+        }
+
+        let mut machine = Machine::new(mem);
+        while let Ok(_) = machine.step() {
+            machine.print_regs();
+        }
+        assert_eq!(machine.registers[Register::A as usize], 10);
     }
 }
