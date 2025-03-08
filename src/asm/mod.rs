@@ -249,7 +249,14 @@ fn parse_arithmetic(op: ArithmeticOp) -> impl Fn(&[&str]) -> Result<Instruction,
 fn parse_immediate(s: &str) -> Result<u16, AsmError> {
     if s.starts_with("#") {
         let value = &s[1..];
-        return value.parse::<u16>().map_err(|_| AsmError::InvalidImmediate);
+
+        if value.starts_with("0x") {
+            let value = &value[2..];
+            dbg!();
+            return u16::from_str_radix(value, 16).map_err(|_| AsmError::InvalidImmediate);
+        } else {
+            return value.parse::<u16>().map_err(|_| AsmError::InvalidImmediate);
+        }
     }
 
     Err(AsmError::InvalidImmediate)

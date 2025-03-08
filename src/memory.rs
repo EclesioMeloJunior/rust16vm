@@ -1,3 +1,5 @@
+use crate::machine::Instruction;
+
 /// Addressable is a trait that defines
 /// any implementation over a memory where
 /// the values can have an address.
@@ -67,6 +69,8 @@ pub trait Addressable {
 pub struct LinearMemory {
     bytes: Vec<u8>,
     size: usize,
+    // read_only holds non-overlapping read-only regions
+    read_only: Vec<(u16,  u16)>,
 }
 
 impl LinearMemory {
@@ -74,7 +78,50 @@ impl LinearMemory {
         Self {
             bytes: vec![0; n],
             size: n,
+            read_only: vec![],
         }
+    }
+
+    // write program stores the set of instructions and mark
+    // the region as read-only
+    pub fn write_program(&mut self, program: &[u16]) -> bool {
+        for (idx, inst) in program.iter().enumerate() {
+            if !self.write2((idx * 2) as u16, *inst) {
+                return false;
+            }
+        }
+        
+        self.as_read_only(0_u16, program.len() as u16)
+    }
+
+    pub fn as_read_only(&mut self, addr: u16, len: u16) -> bool {
+        if self.read_only.is_empty() {
+            self.read_only.push((addr, len));
+            return true;
+        }
+
+        for (in_addr, in_len) in self.read_only.iter() {
+            // check if it overlaps
+            let overlaps = addr >= *in_addr && addr < (*in_addr + *in_len) ||
+                *in_addr >= addr && *in_addr < (addr + len);
+            if overlaps {
+                return false;
+            }
+        }   
+
+        self.read_only.push((addr, len));
+        true
+    }
+
+    fn is_read_only(&self, addr: u16) -> bool {
+        for (start_addr, len) in self.read_only.iter() {
+            // the read-only section contains the given address
+            if addr >= *start_addr && addr < (*start_addr + len) {
+                return true
+            }
+        }
+
+        false
     }
 }
 
@@ -88,6 +135,10 @@ impl Addressable for LinearMemory {
     }
 
     fn write(&mut self, addr: u16, value: u8) -> bool {
+        if self.is_read_only(addr) {
+            return false; 
+        }
+
         if (addr as usize) < self.size {
             self.bytes[addr as usize] = value;
             return true;

@@ -1,21 +1,53 @@
 use rust16vm::{
-    machine::Machine,
-    memory::{Addressable, LinearMemory},
+    devices::terminal::Terminal256, machine::Machine, memory::{self, Addressable, LinearMemory}, mmio::MemoryWithDevices, rv16asm
 };
 
+
 pub fn main() -> () {
-    let mut mem = LinearMemory::new(8 * 1024); //8Kb
-    // 3 instructions to fill a register with ones
-    mem.write2(0, 0b1111111110000001); // MOV A, #8
-    mem.write2(2, 0b1111111010000010); // MSL A, 5 #31
-    mem.write2(4, 0b0001110100000010); // MSL A, 2 #3
+    let program = rv16asm!{ 
+        "MOV A, #72",           // 'h'
+        "MOV B, #0x0F",
+        "MSL B, [#0 #7]",
+        "MSL B, [#0 #5]",      // terminal buffer start
+        "STR A, B",
 
-    let mut vm = Machine::new(mem);
+        "MOV A, #101",           // 'e'
+        "ADD B, #1",
+        "STR A, B",
 
-    let _ = vm.step().unwrap();
-    vm.print_regs();
-    let _ = vm.step().unwrap();
-    vm.print_regs();
-    let _ = vm.step().unwrap();
-    vm.print_regs();
+        "MOV A, #108",           // 'l'
+        "ADD B, #1",
+        "STR A, B",
+
+        "MOV A, #108",           // 'l'
+        "ADD B, #1",
+        "STR A, B",
+
+        "MOV A, #111",           // 'o'
+        "ADD B, #1",
+        "STR A, B",
+
+        "MOV A, #2",
+        "MOV B, #0x0F",
+        "MSL B, [#1 #4]",
+        "MSL B, [#1 #7]",
+        "MSL B, [#0 #1]",
+        "STR A, B",
+
+        "ADD FLAGS, #1",        // halt machine
+    };
+
+    let mut memory = LinearMemory::new(64 * 1024); //64Kb
+
+    assert!(memory.write_program(&program));
+
+    let terminal = Terminal256::new();
+
+    let mut memory = MemoryWithDevices::new(memory);
+
+    memory.register_device(terminal, 0xF000, 512).unwrap();
+
+    let mut machine = Machine::new(memory);
+
+    while let Ok(_) = machine.step() {}
 }

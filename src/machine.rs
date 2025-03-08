@@ -243,7 +243,7 @@ impl<M: Addressable> Machine<M> {
         let raw = self.memory.read2(pc).unwrap();
 
         let inst = Instruction::try_from(raw)?;
-        println!("{:?} @ {}", inst, pc);
+        //println!("{:?} @ {}", inst, pc);
 
         match inst {
             Instruction::Mov(dst_reg, imm) => {
@@ -560,15 +560,32 @@ mod test {
         };
 
         let mut mem = LinearMemory::new(1024);
-
-        for (idx, inst) in program.iter().enumerate() {
-            assert!(mem.write2((idx * 2) as u16, *inst));
-        }
-
+        assert!(mem.write_program(&program));
+    
         let mut machine = Machine::new(mem);
         while let Ok(_) = machine.step() {
             machine.print_regs();
         }
         assert_eq!(machine.registers[Register::A as usize], 10);
+    }
+
+    #[test]
+    fn should_halt_trying_to_write_at_read_only_addr() {
+        let program = rv16asm!{
+            "MOV A, #39",
+            "MOV B, #100", // B stores the addr
+            "STR A, B"
+        };
+
+        let mut mem = LinearMemory::new(1024);
+        mem.as_read_only(100, 2); // defines addr 100 as readonly
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+        while let Ok(_) = machine.step() {
+            machine.print_regs();
+        }
+            
+        assert_eq!(machine.registers[Register::FLAGS as usize], 5) // the FLAGS should be 0...101
     }
 }
