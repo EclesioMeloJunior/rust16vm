@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 crossterm = "0.27.0"
+async-std = "1.13.0"
+futures = "0.3.31"
 
 [[bin]]
 name = "vm"

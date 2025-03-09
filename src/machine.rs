@@ -233,6 +233,10 @@ impl<M: Addressable> Machine<M> {
         }
     }
 
+    pub fn set_register(&mut self, reg: Register, value: u16) {
+        self.registers[reg as usize] = value;
+    }
+
     pub fn step(&mut self) -> Result<(), String> {
         let halt = self.registers[Register::FLAGS as usize] & 0b1 == 1;
         if halt {
