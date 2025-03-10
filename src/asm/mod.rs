@@ -108,7 +108,9 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
 pub fn parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmError> {
     let mut instructions = Vec::new();
 
-    for line in code.lines() {
+    for (idx, line) in code.lines().enumerate() {
+        println!("{} -> {}", idx * 2, line);
+
         let line = line.trim();
         if line.is_empty() || line.starts_with(";") {
             continue;

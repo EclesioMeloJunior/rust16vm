@@ -39,27 +39,36 @@ pub fn main() -> () {
 
         // now waits user input
         "MOV A, #0",
-        "SUB SP, 2",            // place a flag into stack
+        "SUB SP, #2",            // place a flag into stack
                                 // to define the end of the user input
-        "STR SP, A",
+        "STR A, SP",
 
         "MOV B, #0x0F",
         "MSL B, [#1 #4]",
         "MSL B, [#1 #6]",
-        "MSL B, [#0 #2]",
+        "MSL B, [#0 #2]",       // B has add 0xF104 that reads the keyboard state
 
-        "LDR A, B",             // loads keyboard buffer into stack
-        "SUB SP, 2",
-        "STR SP, A",
+        "LDR A, B",             // loads keyboard status into stack
+        "EQ A, #0",             // keyboard buffer is empty, wait input
+        "CJP #60",
+
+        "SUB SP, #2",
+        "MOV B, #0x0F",
+        "MSL B, [#1 #4]",
+        "MSL B, [#1 #6]",
+        "MSL B, [#1 #2]",       // B has addr 0xF105 that reads the keyboard buffer
+
+        "LDR A, B",
+        "STR A, SP",
 
         "MOV C, #13",           // only stops if the user hits enter
         "NEQ A, C",
-        "CJP #60",
+        "CJP #52",
 
         "MOV B, #0x0F",         // print user input
         "MSL B, [#0 #7]",
-        "MSL B, [#0 #5]",       
-        
+        "MSL B, [#0 #5]",
+
         "STR SP, C",
         "ADD SP, #2",
         "EQ C, #0",
