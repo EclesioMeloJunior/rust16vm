@@ -21,17 +21,17 @@ pub enum Register {
     FLAGS,
 }
 
-impl std::fmt::Display for Register {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ToString for Register {
+    fn to_string(&self) -> String {
         match self {
-            Register::A => write!(f, "Reg A"),
-            Register::B => write!(f, "Reg B"),
-            Register::C => write!(f, "Reg C"),
-            Register::M => write!(f, "Reg M"),
-            Register::SP => write!(f, "Reg SP"),
-            Register::PC => write!(f, "Reg PC"),
-            Register::BP => write!(f, "Reg BP"),
-            Register::FLAGS => write!(f, "Reg FL"),
+            Register::A => String::from("A"),
+            Register::B => String::from("B"),
+            Register::C => String::from("C"),
+            Register::M => String::from("M"),
+            Register::SP => String::from("SP"),
+            Register::PC => String::from("PC"),
+            Register::BP => String::from("BP"),
+            Register::FLAGS => String::from("FLAGS"),
         }
     }
 }
@@ -95,6 +95,8 @@ impl TryFrom<usize> for CompareOp {
 /// LDR | STR - operations on the memory
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Instruction {
+    Noop,
+
     // Format: 0001 | reg(3) | immediate(9)
     Mov(Register, u16),
     // Move with shift
@@ -382,7 +384,7 @@ impl<M: Addressable> Machine<M> {
         for (idx, value) in self.registers.iter().enumerate() {
             println!(
                 "{}:\t{:#018b} | {:#04x} | {}",
-                Register::try_from(idx).unwrap(),
+                Register::try_from(idx).unwrap().to_string(),
                 value,
                 value,
                 value
@@ -565,7 +567,7 @@ mod test {
 
         let mut mem = LinearMemory::new(1024);
         assert!(mem.write_program(&program));
-    
+
         let mut machine = Machine::new(mem);
         while let Ok(_) = machine.step() {
             machine.print_regs();
@@ -575,7 +577,7 @@ mod test {
 
     #[test]
     fn should_halt_trying_to_write_at_read_only_addr() {
-        let program = rv16asm!{
+        let program = rv16asm! {
             "MOV A, #39",
             "MOV B, #100", // B stores the addr
             "STR A, B"
@@ -589,7 +591,7 @@ mod test {
         while let Ok(_) = machine.step() {
             machine.print_regs();
         }
-            
+
         assert_eq!(machine.registers[Register::FLAGS as usize], 5) // the FLAGS should be 0...101
     }
 }

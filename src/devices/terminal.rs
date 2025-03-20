@@ -90,7 +90,6 @@ impl Terminal256 {
 
 impl Device for Terminal256 {
     fn read(&self, offset: usize) -> u8 {
-
         match offset {
             TERM_BUFFER_START..=TERM_BUFFER_END => {
                 self.buffer[offset - TERM_BUFFER_START]
@@ -103,6 +102,8 @@ impl Device for Terminal256 {
     }
 
     fn write(&mut self, offset: usize, value: u8) {
+        let offset = offset;
+
         match offset {
             TERM_BUFFER_START..=TERM_BUFFER_END => {
                 self.buffer[offset-TERM_BUFFER_START] = value;

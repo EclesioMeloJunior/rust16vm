@@ -12,3 +12,6 @@ futures = "0.3.31"
 name = "vm"
 path = "./bin/vm.rs"
 
+[[bin]]
+name = "asm"
+path = "./bin/asm.rs"

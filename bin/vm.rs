@@ -1,3 +1,8 @@
+use std::env::{self};
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::Path;
+
 use rust16vm::{
     devices::{keyboard::Keyboard, terminal::Terminal256},
     machine::{Machine, Register},
@@ -5,9 +10,8 @@ use rust16vm::{
     mmio::MemoryWithDevices,
     rv16asm,
 };
-
-pub fn main() -> () {
-    let program = rv16asm! {
+/*
+let program = rv16asm! {
         "MOV A, #72",           // 'h'
         "MOV B, #0x0F",
         "MSL B, [#0 #7]",
@@ -87,6 +91,40 @@ pub fn main() -> () {
 
         "ADD FLAGS, #1",        // halt machine
     };
+*/
+
+pub fn main() -> () {
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        eprintln!("expected 1 positional arg, received {}", args.len() - 1);
+        return;
+    }
+
+    let path = Path::new(&args[1]);
+    let open_file = File::open(path);
+
+    let mut input_program: Vec<u8> = Vec::new();
+    match open_file {
+        Ok(file) => {
+            let mut buf = BufReader::new(file);
+            match buf.read_to_end(&mut input_program) {
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("reading input program: {}", err);
+                    return;
+                }
+            }
+        }
+        Err(err) => {
+            eprintln!("opening input program: {}", err);
+            return;
+        }
+    };
+
+    let program: Vec<u16> = input_program
+        .chunks(2)
+        .map(|chunk| (chunk[1] as u16) << 8 | (chunk[0] as u16))
+        .collect();
 
     let mut memory = LinearMemory::new(63 * 1024); //63Kb
 
