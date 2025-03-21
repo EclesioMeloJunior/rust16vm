@@ -1,17 +1,19 @@
-use std::io::{stdout, Write};
+use std::{
+    io::{Write, stdout},
+    usize,
+};
 
 use crossterm::{
-    cursor,
-    style::{self, Stylize},
+    ExecutableCommand, QueueableCommand, cursor, execute,
+    style::{self, Print, Stylize},
     terminal::{self, Clear, ClearType},
-    ExecutableCommand, QueueableCommand,
 };
 
 use super::Device;
 
 const TERM_BUFFER_START: usize = 0x0000;
-const TERM_BUFFER_SIZE: usize= 256;
-const TERM_BUFFER_END: usize = TERM_BUFFER_START + TERM_BUFFER_SIZE -1;
+const TERM_BUFFER_SIZE: usize = 256;
+const TERM_BUFFER_END: usize = TERM_BUFFER_START + TERM_BUFFER_SIZE - 1;
 
 const TERM_CURSOR_X: usize = 0x0100;
 const TERM_CURSOR_Y: usize = 0x0101;
@@ -38,7 +40,7 @@ impl Terminal256 {
         let mut stdout = stdout();
         //let _ = stdout.execute(terminal::EnterAlternateScreen);
         let _ = stdout.execute(Clear(ClearType::All));
-        let _ = stdout.execute(cursor::MoveTo(0,0));
+        let _ = stdout.execute(cursor::MoveTo(0, 0));
 
         Self {
             buffer: [0; TERM_BUFFER_SIZE],
@@ -59,15 +61,17 @@ impl Terminal256 {
                 let _ = stdout.flush();
             }
             TERM_CMD_FLUSH => {
-                let end_pos = self.buffer.iter()
-                    .position(|&b| b == 0)
+                let end_pos = self
+                    .buffer
+                    .iter()
+                    .position(|&b| b == 3)
                     .unwrap_or(TERM_BUFFER_SIZE);
 
                 if let Ok(text) = std::str::from_utf8(&self.buffer[0..end_pos]) {
-                    let _ = stdout.execute(cursor::MoveTo(self.cursor.0 as u16, self.cursor.1 as u16));
+                    let _ =
+                        stdout.execute(cursor::MoveTo(self.cursor.0 as u16, self.cursor.1 as u16));
                     let _ = stdout.execute(style::Print(text));
                     let _ = stdout.flush();
-
                     self.buffer = [0; TERM_BUFFER_SIZE];
                 } else {
                     self.flags |= TERM_FLAG_ERROR;
@@ -79,11 +83,11 @@ impl Terminal256 {
                 let _ = stdout.execute(cursor::MoveTo(self.cursor.0 as u16, self.cursor.1 as u16));
                 let _ = stdout.flush();
             }
-            TERM_CMD_SET_CURSOR => { 
+            TERM_CMD_SET_CURSOR => {
                 let _ = stdout.execute(cursor::MoveTo(self.cursor.0 as u16, self.cursor.1 as u16));
                 let _ = stdout.flush();
             }
-            _ => self.flags |= TERM_FLAG_ERROR
+            _ => self.flags |= TERM_FLAG_ERROR,
         }
     }
 }
@@ -91,9 +95,7 @@ impl Terminal256 {
 impl Device for Terminal256 {
     fn read(&self, offset: usize) -> u8 {
         match offset {
-            TERM_BUFFER_START..=TERM_BUFFER_END => {
-                self.buffer[offset - TERM_BUFFER_START]
-            }
+            TERM_BUFFER_START..=TERM_BUFFER_END => self.buffer[offset - TERM_BUFFER_START],
             TERM_CURSOR_X => self.cursor.0,
             TERM_CURSOR_Y => self.cursor.1,
             TERM_FLAGS => self.flags,
@@ -102,17 +104,15 @@ impl Device for Terminal256 {
     }
 
     fn write(&mut self, offset: usize, value: u8) {
-        let offset = offset;
-
         match offset {
             TERM_BUFFER_START..=TERM_BUFFER_END => {
-                self.buffer[offset-TERM_BUFFER_START] = value;
+                self.buffer[offset - TERM_BUFFER_START] = value;
             }
             TERM_CURSOR_X => self.cursor.0 = value,
             TERM_CURSOR_Y => self.cursor.1 = value,
             TERM_COMMAND => self.execute_command(value),
             TERM_FLAGS => self.flags = value,
-            _ => ()
+            _ => (),
         }
     }
 }
@@ -120,8 +120,8 @@ impl Device for Terminal256 {
 impl Drop for Terminal256 {
     fn drop(&mut self) {
         let mut stdout = stdout();
-        //let _ = stdout.execute(terminal::LeaveAlternateScreen);
-        
+        let _ = stdout.execute(terminal::LeaveAlternateScreen);
+
         let _ = stdout.execute(cursor::MoveTo(0, (self.cursor.1 as u16) + 1));
         let _ = stdout.flush();
         let _ = terminal::disable_raw_mode();

@@ -1,5 +1,11 @@
 use crate::machine::{ArithmeticOp, CompareOp, Instruction, Register};
-use std::{collections::{hash_map::Entry, HashMap}, env::args, fmt::format, hash::Hash, str::FromStr};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    env::args,
+    fmt::format,
+    hash::Hash,
+    str::FromStr,
+};
 
 pub mod macros;
 
@@ -45,6 +51,9 @@ impl ToString for Instruction {
                     format!("MSR {}, [#{} #{}]", reg.to_string(), shift_amt, imm)
                 }
             }
+            Instruction::Cpy(src_reg, dst_reg) => {
+                format!("CPY {}, {}", src_reg.to_string(), dst_reg.to_string())
+            }
             Instruction::Arith(reg, opt_reg, opt_imm, op) => {
                 let op = match op {
                     ArithmeticOp::Add => "ADD",
@@ -63,6 +72,22 @@ impl ToString for Instruction {
             }
             Instruction::LdrStr(reg, rhs_reg, is_str, shift) => {
                 let op = if *is_str { "STR" } else { "LDR" };
+
+                let rhs = if *shift == 0 {
+                    rhs_reg.to_string()
+                } else {
+                    format!("[{} #{}]", rhs_reg.to_string(), shift.to_string())
+                };
+
+                format!(
+                    "{} {}, {}",
+                    op.to_string(),
+                    reg.to_string(),
+                    rhs.to_string(),
+                )
+            }
+            Instruction::LdbStb(reg, rhs_reg, is_str, shift) => {
+                let op = if *is_str { "STB" } else { "LDB" };
 
                 let rhs = if *shift == 0 {
                     rhs_reg.to_string()
@@ -136,6 +161,11 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
 
             (imm << 11) | dir << 10 | (shift << 7) | (reg_code << 4) | 0b0010
         }
+        Instruction::Cpy(src, dst) => {
+            let src_reg = (*src as u16) & 0b111;
+            let dst_reg = (*dst as u16) & 0b111;
+            (dst_reg << 7) | (src_reg << 4) | 0b1001
+        }
         Instruction::Arith(dst_reg, opt_src_reg, opt_imm, op) => {
             let reg_code = (*dst_reg as u16) & 0b111;
             let op = match op {
@@ -163,6 +193,17 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
             }
 
             (shift << 11) | (str << 10) | (addr_reg << 7) | (r0_code << 4) | 0b0100
+        }
+        Instruction::LdbStb(r0, addr_reg, is_str, shift) => {
+            let r0_code = (*r0 as u16) & 0b111;
+            let addr_reg = (*addr_reg as u16) & 0b111;
+            let shift = (*shift as u16) & 0b11111;
+            let mut str = 0b0;
+            if *is_str {
+                str = 0b1;
+            }
+
+            (shift << 11) | (str << 10) | (addr_reg << 7) | (r0_code << 4) | 0b1000
         }
         Instruction::Jmp(opt_reg, opt_imm) => {
             let (mode, value) = match (opt_reg, opt_imm) {
@@ -223,10 +264,13 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
     // considering  we start at addr 0 and we increase 2 (given
     // that each instruction is 2 bytes long) we might be fine.
     let mut curr_inst_addr = 0;
+    let mut line_number = 0;
+
     for line in code.lines().into_iter() {
+        line_number += 1;
         let line = line.trim();
 
-        if line.len() == 0 {
+        if line.len() == 0 || line.starts_with(";") {
             // don't need to increase addr
             continue;
         }
@@ -270,8 +314,9 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
                 };
             }
             Err(err) => {
-                eprintln!("{:?}", err);
-            }
+                eprintln!("problems at line: {}: {}", line_number, line.to_string());
+                return Err(err)
+            },
         }
 
         curr_inst_addr += 2;
@@ -300,12 +345,16 @@ pub fn parse_assembly_line<'a>(
         "MOV" => Box::new(parse_mov),
         "MSL" => Box::new(parse_mov_shift(true)),
         "MSR" => Box::new(parse_mov_shift(false)),
+
+        "CPY" => Box::new(parse_copy),
         "ADD" => Box::new(parse_arithmetic(ArithmeticOp::Add)),
         "SUB" => Box::new(parse_arithmetic(ArithmeticOp::Sub)),
         "MUL" => Box::new(parse_arithmetic(ArithmeticOp::Mul)),
         "DIV" => Box::new(parse_arithmetic(ArithmeticOp::Div)),
-        "LDR" => Box::new(parse_ldr_str(false)),
-        "STR" => Box::new(parse_ldr_str(true)),
+        "LDR" => Box::new(parse_ldr_str(false, false)),
+        "STR" => Box::new(parse_ldr_str(false, true)),
+        "LDB" => Box::new(parse_ldr_str(true, false)),
+        "STB" => Box::new(parse_ldr_str(true, true)),
         "JMP" => Box::new(parse_jmp(false, labels)),
         "CJP" => Box::new(parse_jmp(true, labels)),
         "EQ" => Box::new(parse_comparision(CompareOp::Eq)),
@@ -371,7 +420,7 @@ fn parse_jmp<'a>(
 }
 
 // LDR A, [B, #4]
-fn parse_ldr_str(is_str: bool) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
+fn parse_ldr_str(is_byte: bool, is_str: bool) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
     move |args: &[&str]| -> Result<Instruction, AsmError> {
         if args.len() > 3 {
             return Err(AsmError::InvalidInstruction);
@@ -380,18 +429,31 @@ fn parse_ldr_str(is_str: bool) -> impl Fn(&[&str]) -> Result<Instruction, AsmErr
         let reg_dst = args[0].trim_end_matches(',').parse::<Register>()?;
         if !args[1].starts_with('[') {
             let reg_src = args[1].parse::<Register>()?;
-            return Ok(Instruction::LdrStr(reg_dst, reg_src, is_str, 0));
+            if is_byte {
+                return Ok(Instruction::LdbStb(reg_dst, reg_src, is_str, 0));
+            } else {
+                return Ok(Instruction::LdrStr(reg_dst, reg_src, is_str, 0));
+            }
         }
 
         let reg_src = args[1].trim_start_matches('[').parse::<Register>()?;
         let shift = parse_immediate(args[2].trim_end_matches(']'))?;
 
-        Ok(Instruction::LdrStr(
-            reg_dst,
-            reg_src,
-            is_str,
-            shift.try_into().map_err(|_| AsmError::InvalidImmediate)?,
-        ))
+        if is_byte {
+            Ok(Instruction::LdbStb(
+                reg_dst,
+                reg_src,
+                is_str,
+                shift.try_into().map_err(|_| AsmError::InvalidImmediate)?,
+            ))
+        } else {
+            Ok(Instruction::LdrStr(
+                reg_dst,
+                reg_src,
+                is_str,
+                shift.try_into().map_err(|_| AsmError::InvalidImmediate)?,
+            ))
+        }
     }
 }
 
@@ -436,6 +498,17 @@ fn parse_immediate(s: &str) -> Result<u16, AsmError> {
     Err(AsmError::InvalidImmediate)
 }
 
+fn parse_copy(args: &[&str]) -> Result<Instruction, AsmError> {
+    if args.len() != 2 {
+        return Err(AsmError::InvalidInstruction);
+    }
+
+    let src_reg = args[0].trim_end_matches(',').parse::<Register>()?;
+    let dst_reg = args[1].parse::<Register>()?;
+
+    Ok(Instruction::Cpy(src_reg, dst_reg))
+}
+
 fn parse_mov(args: &[&str]) -> Result<Instruction, AsmError> {
     if args.len() != 2 {
         return Err(AsmError::InvalidInstruction);
@@ -469,6 +542,8 @@ fn parse_mov_shift(dir: bool) -> impl Fn(&[&str]) -> Result<Instruction, AsmErro
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use crate::machine::{ArithmeticOp, CompareOp, Instruction, Register};
 
     use super::{encode_instruction, parse_assembly_line};
@@ -506,95 +581,97 @@ mod test {
 
     #[test]
     fn test_assembly_line() {
+        let empty = HashMap::new();
+
         let input = "MOV A, #10";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(inst, Instruction::Mov(Register::A, 10));
 
         let input = "MSL A, [#11 #4]";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(inst, Instruction::MovShift(Register::A, 4, true, 11));
 
         let input = "MSR B, [#15 #2]";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(inst, Instruction::MovShift(Register::B, 2, false, 15));
 
         let input = "ADD A, #10";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Arith(Register::A, None, Some(10), ArithmeticOp::Add)
         );
 
         let input = "SUB B, SP";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Arith(Register::B, Some(Register::SP), None, ArithmeticOp::Sub)
         );
 
         let input = "MUL C, #5";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Arith(Register::C, None, Some(5), ArithmeticOp::Mul)
         );
 
         let input = "MUL A, B";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Arith(Register::A, Some(Register::B), None, ArithmeticOp::Mul)
         );
 
         let input = "DIV M, #16";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Arith(Register::M, None, Some(16), ArithmeticOp::Div)
         );
 
         let input = "DIV BP, A";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Arith(Register::BP, Some(Register::A), None, ArithmeticOp::Div)
         );
 
         let input = "STR SP, A";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::LdrStr(Register::SP, Register::A, true, 0)
         );
 
         let input = "LDR C, [SP #4]";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::LdrStr(Register::C, Register::SP, false, 4)
         );
 
         let input = "JMP #10";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(inst, Instruction::Jmp(None, Some(10)));
 
         let input = "JMP A";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(inst, Instruction::Jmp(Some(Register::A), None));
 
         let input = "CJP #10";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(inst, Instruction::CondJmp(None, Some(10)));
 
         let input = "EQ A, B";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Cmp(Register::A, Some(Register::B), None, CompareOp::Eq)
         );
 
         let input = "LT A, #10";
-        let inst = parse_assembly_line(input).unwrap();
+        let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
             Instruction::Cmp(Register::A, None, Some(10), CompareOp::Less)

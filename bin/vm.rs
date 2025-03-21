@@ -126,7 +126,7 @@ pub fn main() -> () {
         .map(|chunk| (chunk[1] as u16) << 8 | (chunk[0] as u16))
         .collect();
 
-    let mut memory = LinearMemory::new(63 * 1024); //63Kb
+    let mut memory = LinearMemory::new(1 << 16); //63Kb
 
     assert!(memory.write_program(&program));
 

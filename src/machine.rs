@@ -99,6 +99,12 @@ pub enum Instruction {
 
     // Format: 0001 | reg(3) | immediate(9)
     Mov(Register, u16),
+
+    // Copy a value stored in the first register to the
+    // address in the second register
+    // Format: 1001 | reg(3) | reg(3) | ...
+    Cpy(Register, Register),
+
     // Move with shift
     // Format: 0010 | reg(3) | shift_amt(3) | direction(1) | immediate(5)
     // direction 1 then shift left
@@ -110,9 +116,13 @@ pub enum Instruction {
     // op: 00 (add) 01 (sub) 10 (mul) 11 (div)
     Arith(Register, Option<Register>, Option<u16>, ArithmeticOp),
 
-    // Load or Store the register value in the memory
+    // Load or Store a u16 the register value in the memory
     // Format: 0100 | reg(3) | reg(3) | type (1) | shift (5)
     LdrStr(Register, Register, bool, u8),
+
+    // Load or Store a byte in the memory
+    // Format: 1000 | reg(3) | reg(3) | type (1) | shift (5)
+    LdbStb(Register, Register, bool, u8),
 
     // Set the PC to a specific memory address
     // Format: 0110 | mode (1) | [mode == 1]reg(3) | [mode == 0]imm(11)
@@ -134,6 +144,7 @@ impl TryFrom<u16> for Instruction {
     fn try_from(inst: u16) -> Result<Self, Self::Error> {
         let opcode = inst & 0b1111;
         match opcode {
+            0b0000 => Ok(Instruction::Noop),
             0b0001 => {
                 let reg_dst = ((inst >> 4) & 0b111) as usize;
                 let imm = (inst >> 7) & 0b111111111;
@@ -149,6 +160,14 @@ impl TryFrom<u16> for Instruction {
                     sh_amt,
                     dir,
                     imm,
+                ));
+            }
+            0b1001 => {
+                let reg_src = ((inst >> 4) & 0b111) as usize;
+                let reg_dst = ((inst >> 7) & 0b111) as usize;
+                return Ok(Instruction::Cpy(
+                    Register::try_from(reg_src)?,
+                    Register::try_from(reg_dst)?,
                 ));
             }
             0b0011 => {
@@ -177,6 +196,13 @@ impl TryFrom<u16> for Instruction {
                 let is_str = (inst >> 10) & 0b1 == 1;
                 let shift = (inst >> 11) as u8;
                 Ok(Instruction::LdrStr(r0, addr_reg, is_str, shift))
+            }
+            0b1000 => {
+                let r0 = Register::try_from(((inst >> 4) & 0b111) as usize)?;
+                let addr_reg = Register::try_from(((inst >> 7) & 0b111) as usize)?;
+                let is_str = (inst >> 10) & 0b1 == 1;
+                let shift = (inst >> 11) as u8;
+                Ok(Instruction::LdbStb(r0, addr_reg, is_str, shift))
             }
             0b0110 => {
                 let is_reg_mode = (inst >> 4) & 0b1 == 1;
@@ -266,6 +292,13 @@ impl<M: Addressable> Machine<M> {
                 curr_value |= imm;
                 self.registers[dst_reg as usize] = curr_value;
             }
+            Instruction::Cpy(reg_src, reg_dst) => {
+                let src_addr = self.registers[reg_src as usize];
+                let dst_addr = self.registers[reg_dst as usize];
+                if !self.memory.copy(src_addr, dst_addr, 1) {
+                    self.set_flags((0b1 << 2) | 0b1);
+                }
+            }
             Instruction::Arith(dst_reg, src_reg, imm, arith_op) => match (src_reg, imm) {
                 (Some(src), None) => {
                     self.arithmetic_op(dst_reg, self.registers[src as usize], arith_op)
@@ -288,6 +321,24 @@ impl<M: Addressable> Machine<M> {
                 } else {
                     if let Some(value) = self.memory.read2(at) {
                         self.registers[r0 as usize] = value;
+                    }
+                }
+            }
+            Instruction::LdbStb(r0, addr_reg, is_str, shift) => {
+                let base = self.registers[addr_reg as usize];
+                let at = base + (shift as u16);
+
+                if is_str {
+                    let to_store: u8 = self.registers[r0 as usize] as u8;
+                    if !self.memory.write(at, to_store) {
+                        // failed to perform memory write
+                        // force a halt
+                        // 0b0...101
+                        self.set_flags((0b1 << 2) | 0b1);
+                    }
+                } else {
+                    if let Some(value) = self.memory.read(at) {
+                        self.registers[r0 as usize] = value as u16;
                     }
                 }
             }
@@ -356,7 +407,6 @@ impl<M: Addressable> Machine<M> {
                 if store_mod {
                     self.memory
                         .write2(self.registers[Register::SP as usize], lhs % imm);
-                    self.registers[Register::SP as usize] += 2;
                 }
                 lhs / imm
             }

@@ -99,10 +99,6 @@ impl Extension {
                     .map(|inst| encode_instruction(inst))
                     .collect();
 
-                for inst in encoded.clone().iter() {
-                    println!("{}", inst)
-                }
-
                 let bin_instructions: Vec<u8> =
                     encoded.iter().flat_map(|inst| inst.to_le_bytes()).collect();
 
