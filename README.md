@@ -46,3 +46,19 @@ while let Ok(_) = machine.step() {
 
 assert_eq!(machine.registers[Register::A as usize], 10);
 ```
+
+### A complex for loop
+
+I've made a more complex for loop that uses the terminal device to show
+the numbers under iteration. The file combines char arithmetic, stack size and some sort  of function calling using the current instruction set.
+
+If you want to try it out you need to 
+1 - Use the assembler to generate the binary file: 
+```
+cargo build --release && ./target/release/asm output.bin ./testdata/loop.s
+```
+2 - The run the generated binary! 
+
+```
+./target/release/vm ./output.bin
+```
