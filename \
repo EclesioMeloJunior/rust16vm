@@ -131,8 +131,7 @@ pub fn main() -> () {
 
     assert!(memory.write_program(&program));
 
-    let mut opts = ScreenOptions::default();
-    opts.debug_instructions(program.clone(), 0);
+    let mut opts = ScreenOptions::default().debug_instructions(program.clone(), 0);
 
     let screen = ScreenDevice::start_and_debug(opts);
 
