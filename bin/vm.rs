@@ -5,7 +5,7 @@ use std::path::Path;
 
 use rust16vm::devices::screen::ScreenOptions;
 use rust16vm::{
-    devices::{keyboard::Keyboard, terminal::Terminal256, screen::ScreenDevice},
+    devices::{keyboard::Keyboard, screen::ScreenDevice, terminal::Terminal256},
     machine::{Machine, Register},
     memory::{self, Addressable, LinearMemory},
     mmio::MemoryWithDevices,

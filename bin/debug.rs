@@ -5,7 +5,7 @@ use std::path::Path;
 
 use rust16vm::devices::screen::ScreenOptions;
 use rust16vm::{
-    devices::{keyboard::Keyboard, terminal::Terminal256, screen::ScreenDevice},
+    devices::{keyboard::Keyboard, screen::ScreenDevice, terminal::Terminal256},
     machine::{Machine, Register},
     memory::{self, Addressable, LinearMemory},
     mmio::MemoryWithDevices,
@@ -131,17 +131,14 @@ pub fn main() -> () {
 
     assert!(memory.write_program(&program));
 
-    let mut opts = ScreenOptions::default().debug_instructions(program.clone(), 0);
+    let mut opts = ScreenOptions::default();
+    opts.debug_instructions(program.clone(), 0);
 
-    let screen = ScreenDevice::start_and_debug(opts);
-
-    // let terminal = Terminal256::new();
-    let keyboard = Keyboard::new();
+    let screen = ScreenDevice::start(opts);
 
     let mut memory = MemoryWithDevices::new(memory);
 
     memory.register_device(screen, 0xF000, 259).unwrap();
-    memory.register_device(keyboard, 0xF104, 2).unwrap();
 
     let mut machine = Machine::new(memory);
     // define the stack pointer to the memory end;
@@ -150,4 +147,16 @@ pub fn main() -> () {
     loop {}
 
     while let Ok(_) = machine.step() {}
+}
+
+struct DebugManager {
+    debug_screen: crossbeam_channel::Sender<ScreenExchange>,
+    machine_proc: crossbeam_channel::Sender<MachineExchange>
+}
+
+impl DebugManager {
+    pub fn new() -> Self {
+
+
+    }
 }

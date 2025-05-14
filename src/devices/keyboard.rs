@@ -27,6 +27,7 @@ impl Keyboard {
 }
 
 async fn non_blocking_keyboard(keyboard: Arc<Mutex<InnerKeyboard>>) {
+    println!("started non blocking keyboard...");
     loop {
         if poll(Duration::from_millis(0)).unwrap() {
             let evt = read().unwrap();
@@ -37,6 +38,7 @@ async fn non_blocking_keyboard(keyboard: Arc<Mutex<InnerKeyboard>>) {
                             let mut kb = keyboard.lock().unwrap();
                             kb.buffer.push_back(c as u8);
                             kb.flags = BUFFER_NOT_EMPTY;
+                            println!("buffer not empty: {:?}", kb.buffer);
                         }
                         keyboard.lock().unwrap().buffer.push_back(c as u8);
                     }

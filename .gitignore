@@ -1,2 +1,4 @@
 /target
 .goals
+
+*.bin

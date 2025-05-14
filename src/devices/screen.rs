@@ -45,6 +45,8 @@ impl WidgetRef for InstructionsPane {
             "<Left>".blue().bold(),
             " Next ".into(),
             "<Right>".blue().bold(),
+            " Execute ".into(),
+            "<E>".blue().bold(),
             " Quit ".into(),
             "<Q> ".blue().bold(),
         ]);
@@ -55,7 +57,9 @@ impl WidgetRef for InstructionsPane {
 
         let mut window_of_instructions = vec![];
         if self.current_instruction < 4 {
-            for (idx, inst) in self.code[0..10].iter().enumerate() {
+            let window_len = std::cmp::min(10, self.code.len());
+
+            for (idx, inst) in self.code[0..window_len].iter().enumerate() {
                 window_of_instructions.push((inst.clone(), idx == self.current_instruction));
             }
         } else {
@@ -86,10 +90,34 @@ impl WidgetRef for InstructionsPane {
     }
 }
 
+// TODO
+struct RegistersPane;
+
+impl WidgetRef for RegistersPane {
+    fn render_ref(&self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered()
+            .title("Machine Registers");
+
+        let regs: Vec<ListItem> = vec![
+            ListItem::new(Line::from(vec![Span::styled("A:     0x0".to_string(), Style::default().fg(Color::White))])),
+            ListItem::new(Line::from(vec![Span::styled("B:     0x0".to_string(), Style::default().fg(Color::White))])),
+            ListItem::new(Line::from(vec![Span::styled("C:     0x0".to_string(), Style::default().fg(Color::White))])),
+            ListItem::new(Line::from(vec![Span::styled("M:     0x0".to_string(), Style::default().fg(Color::White))])),
+            ListItem::new(Line::from(vec![Span::styled("SP:    0x0".to_string(), Style::default().fg(Color::White))])),
+            ListItem::new(Line::from(vec![Span::styled("BP:    0x0".to_string(), Style::default().fg(Color::White))])),
+            ListItem::new(Line::from(vec![Span::styled("PC:    0x0".to_string(), Style::default().fg(Color::White))])),
+            ListItem::new(Line::from(vec![Span::styled("FLAGS: 0x0".to_string(), Style::default().fg(Color::White))])),
+        ];
+
+        List::new(regs).block(block).render(area, buf);
+    }
+}
+
 struct Screen {
     rx: crossbeam_channel::Receiver<ScreenExchange>,
     exit: bool,
     instructions_pane: Option<InstructionsPane>,
+    registers_pane: Option<RegistersPane>,
 }
 
 impl Screen {
@@ -98,6 +126,7 @@ impl Screen {
             rx,
             exit: false,
             instructions_pane: None,
+            registers_pane: None,
         }
     }
 
@@ -105,9 +134,7 @@ impl Screen {
         while !self.exit {
             match self.rx.try_recv() {
                 Ok(msg) => {
-                    match msg {
-                        _ => {}
-                    };
+                    println!("received message: {:?}", msg)
                 }
                 Err(TryRecvError::Empty) => {}
                 Err(err) => {
@@ -172,7 +199,10 @@ impl Widget for &Screen {
 
         Block::bordered().title("Terminal").render(left, buf);
 
-        Block::bordered().title("Registers").render(top_right, buf);
+        if let Some(ref registers_pane) = self.registers_pane {
+            registers_pane.render(top_right, buf);
+        }
+
         Block::bordered().title("Logs").render(center_right, buf);
 
         if let Some(ref instructions_pane) = self.instructions_pane {
@@ -201,6 +231,8 @@ async fn screen_main(
     let mut terminal = ratatui::init();
     let mut screen = Screen::new(rx);
 
+    screen.registers_pane = Some(RegistersPane);
+
     if let Some((instructions, current_inst)) = opts.show_instructions {
         screen.instructions_pane = Some(InstructionsPane::new(instructions, current_inst));
     }
@@ -210,33 +242,21 @@ async fn screen_main(
     res
 }
 
+#[derive(Debug)]
 enum ScreenExchange {
     Read(usize, crossbeam_channel::Sender<u8>),
     Write((usize, u8)),
 }
 
 pub struct ScreenDevice {
-    tx: crossbeam_channel::Sender<ScreenExchange>,
     device_handle: JoinHandle<io::Result<()>>,
 }
 
 impl ScreenDevice {
-    pub fn start() -> Self {
-        let (tx, rx) = unbounded::<ScreenExchange>();
-        let handle = async_std::task::spawn(screen_main(Default::default(), rx));
-
-        ScreenDevice {
-            tx,
-            device_handle: handle,
-        }
-    }
-
-    pub fn start_and_debug(opts: ScreenOptions) -> Self {
-        let (tx, rx) = unbounded::<ScreenExchange>();
+    pub fn start(opts: ScreenOptions, rx: crossbeam_channel::Sender<ScreenExchange>) -> Self {
         let handle = async_std::task::spawn(screen_main(opts, rx));
 
         ScreenDevice {
-            tx,
             device_handle: handle,
         }
     }
@@ -248,6 +268,6 @@ impl Device for ScreenDevice {
     }
 
     fn write(&mut self, offset: usize, value: u8) {
-        todo!()
+        println!("trying to write to the screen device!");
     }
 }
