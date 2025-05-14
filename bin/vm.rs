@@ -134,21 +134,14 @@ pub fn main() -> () {
     let mut opts = ScreenOptions::default();
     opts.debug_instructions(program.clone(), 0);
 
-    let screen = ScreenDevice::start_and_debug(opts);
-
-    // let terminal = Terminal256::new();
-    let keyboard = Keyboard::new();
-
+    let terminal = Terminal256::new();
     let mut memory = MemoryWithDevices::new(memory);
 
-    memory.register_device(screen, 0xF000, 259).unwrap();
-    memory.register_device(keyboard, 0xF104, 2).unwrap();
+    memory.register_device(terminal, 0xF000, 259).unwrap();
 
     let mut machine = Machine::new(memory);
     // define the stack pointer to the memory end;
     machine.set_register(Register::SP, 0xFFFF);
-
-    loop {}
 
     while let Ok(_) = machine.step() {}
 }

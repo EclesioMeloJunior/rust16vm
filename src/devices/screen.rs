@@ -253,13 +253,13 @@ pub struct ScreenDevice {
 }
 
 impl ScreenDevice {
-    pub fn start(opts: ScreenOptions, rx: crossbeam_channel::Sender<ScreenExchange>) -> Self {
-        let handle = async_std::task::spawn(screen_main(opts, rx));
+     // pub fn start(opts: ScreenOptions, rx: crossbeam_channel::Sender<ScreenExchange>) -> Self {
+        // let handle = async_std::task::spawn(screen_main(opts, rx));
 
-        ScreenDevice {
-            device_handle: handle,
-        }
-    }
+        //ScreenDevice {
+        //    device_handle: handle,
+        // }
+    // }
 }
 
 impl Device for ScreenDevice {
