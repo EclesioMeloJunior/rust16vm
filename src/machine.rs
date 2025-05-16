@@ -637,7 +637,6 @@ mod test {
 
         let mut machine = Machine::new(mem);
         while let Ok(_) = machine.step() {
-            println!("");
             machine.print_regs();
         }
 
