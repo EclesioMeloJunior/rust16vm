@@ -396,6 +396,10 @@ impl<M: Addressable> Machine<M> {
         self.registers[Register::FLAGS as usize] |= flags;
     }
 
+    fn remove_flags(&mut self, flags: u16) {
+        self.registers[Register::FLAGS as usize] ^= flags;
+    }
+
     fn arithmetic_op(&mut self, dst_reg: Register, imm: u16, op: ArithmeticOp) {
         let lhs = self.registers[dst_reg as usize];
         let result = match op {
@@ -427,6 +431,8 @@ impl<M: Addressable> Machine<M> {
 
         if is_true {
             self.set_flags(1 << 3);
+        } else {
+            self.remove_flags(1 << 3);
         }
     }
 
@@ -643,5 +649,25 @@ mod test {
         }
 
         assert_eq!(machine.registers[Register::FLAGS as usize], 5) // the FLAGS should be 0...101
+    }
+
+    #[test]
+    fn should_change_flags() {
+         let program = rv16asm! {
+            "MOV A, #1",
+            "EQ A, #1",
+            "EQ A, #2",
+        };
+
+        let mut mem = LinearMemory::new(1024);
+        mem.as_read_only(100, 2); // defines addr 100 as readonly
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+        while let Ok(_) = machine.step() {
+            machine.print_regs();
+        }
+
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
     }
 }
