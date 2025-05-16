@@ -628,7 +628,9 @@ mod test {
     #[test]
     fn should_halt_trying_to_write_at_read_only_addr() {
         let program = rv16asm! {
-            
+            "MOV A, #39",
+            "MOV B, #100", // B stores the addr
+            "STR A, B"
         };
 
         let mut mem = LinearMemory::new(1024);
