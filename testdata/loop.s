@@ -58,7 +58,7 @@ ADD FLAGS, #1
 ; to get the correct ascii repr
 ; and place in the buffer
 int_to_str:
-GT A, #9
+GTE A, #10
 CJP int_to_str_bef_loop
 
 MOV B, #0x0F
@@ -215,6 +215,3 @@ STR C, B
 STR C, SP
 
 JMP loop
-
-
-
