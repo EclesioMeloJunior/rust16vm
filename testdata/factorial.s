@@ -1,57 +1,22 @@
-; hold the iteration index
-MOV A, #100
+MOV B, #8
+MOV A, #1
 
-; hold the limit
-SUB SP, #2
-MOV B, #115
-STR B, SP
+loop: 
+LTE B, #1
+CJP END
+MUL A, B
+SUB B, #1
+JMP loop
 
-; hold the iteration index
-SUB SP, #2
-MOV B, #0 
-STR B, SP  
-
-loop:
-ADD SP, #2
-LDR B, SP 
-
-GT A, B 
-CJP end
-
-SUB SP, #2
-
-; call int to  str
-SUB SP, #2
-STR A, SP
+END:
 JMP int_to_str
 
 return_to_loop:
-LDR A, SP
-ADD SP, #2
+MOV A, #2
+MOV B, #482
+MSL B, [#2 #7]
+STR A, B
 
-; flush the terminal
-MOV C, #2
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#1 #7]
-MSL B, [#0 #1]
-STB C, B
-
-ADD A, #1
-LDR C, SP
-ADD C, #1 
-
-; place cursor to the next line
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#0 #7]
-MSL B, [#1 #1]
-STR C, B
-STR C, SP
-
-JMP loop
-
-end:
 ADD FLAGS, #1
 
 ; get the algarism, sum to 48
@@ -61,12 +26,13 @@ int_to_str:
 GT A, #9
 CJP int_to_str_bef_loop
 
-MOV B, #0x0F
+MOV B, #480
 MSL B, [#0 #7]
-MSL B, [#0 #5]
+
 ADD A, #48
 STB A, B
 ADD B, #1
+
 ; indicates end_of_text
 MOV A, #3
 STB A, B
@@ -215,6 +181,3 @@ STR C, B
 STR C, SP
 
 JMP loop
-
-
-

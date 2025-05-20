@@ -7,3 +7,4 @@ EQ A, #1
 EQ B, #3
 
 CJP start
+>>>>>>>>> Temporary merge branch 2
