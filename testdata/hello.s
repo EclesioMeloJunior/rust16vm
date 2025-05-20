@@ -9,7 +9,7 @@ STR A, B
     
 MOV A, #108
 ADD B, #1
-STR A, B                                                                        
+STR A, B 
 MOV A, #108
 ADD B, #1
 STR A, B
