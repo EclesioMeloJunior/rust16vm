@@ -1,64 +1,42 @@
-; hold the iteration index
-MOV A, #100
+MOV A, #0
+MOV B, #1
 
-; hold the limit
-SUB SP, #2
-MOV B, #115
-STR B, SP
+MOV M, #0
 
-; hold the iteration index
-SUB SP, #2
-MOV B, #0 
-STR B, SP  
+LOOP:
+GTE M, #10
+CJP END
 
-loop:
-ADD SP, #2
-LDR B, SP 
+ADD A, B
 
-GT A, B 
-CJP end
-
-SUB SP, #2
-
-; call int to  str
 SUB SP, #2
 STR A, SP
-JMP int_to_str
-
-return_to_loop:
-LDR A, SP
+LDR SP, C
 ADD SP, #2
 
-; flush the terminal
-MOV C, #2
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#1 #7]
-MSL B, [#0 #1]
-STB C, B
+SUB SP, #2
+STR B, SP
+LDR SP, A
+ADD SP, #2
 
-ADD A, #1
-LDR C, SP
-ADD C, #1 
-
-; place cursor to the next line
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#0 #7]
-MSL B, [#1 #1]
-STR C, B
+SUB SP, #2
 STR C, SP
+LDR SP, B
+ADD SP, #2
 
-JMP loop
+ADD M, #1
 
-end:
+JMP LOOP
+
+END:
 ADD FLAGS, #1
+
 
 ; get the algarism, sum to 48
 ; to get the correct ascii repr
 ; and place in the buffer
 int_to_str:
-GTE A, #10
+GT A, #9
 CJP int_to_str_bef_loop
 
 MOV B, #0x0F
