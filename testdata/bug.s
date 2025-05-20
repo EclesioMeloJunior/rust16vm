@@ -1,4 +1,3 @@
-
 start:
 MOV A, #1
 MOV B, #2

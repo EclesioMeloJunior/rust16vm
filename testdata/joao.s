@@ -1,19 +1,16 @@
-MOV A, #72
+MOV A, #74
 MOV B, #480
 MSL B, [#0 #7]
 STR A, B
 
-MOV A, #101
-ADD B, #1
-STR A, B
-    
-MOV A, #108
+MOV A, #111
 ADD B, #1
 STR A, B
 
-MOV A, #108
+MOV A, #97
 ADD B, #1
 STR A, B
+
 
 MOV A, #111
 ADD B, #1
