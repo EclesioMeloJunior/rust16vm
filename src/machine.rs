@@ -277,7 +277,7 @@ impl<M: Addressable> Machine<M> {
         let inst = Instruction::try_from(raw)?;
         
         //self.print_regs();
-        //  println!("{:?} @ {}", inst, pc);
+        // println!("{:?} @ {}", inst, pc);
 
         match inst {
             Instruction::Mov(dst_reg, imm) => {
@@ -699,6 +699,53 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
+        while let Ok(_) = machine.step() {
+            //machine.print_regs();
+            //println!("")
+        }
+
+        machine.print_regs();
+        //assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
+    }
+
+
+    #[test]
+    fn run_fibonacci_algorithm() {
+        let program = rv16asm! {
+            "MOV A, #0",
+            "MOV B, #1",
+            "MOV M, #0",
+
+            
+            "GTE M, #9",
+            "CJP #40",
+            "ADD A, B",
+
+            "SUB SP, #2",
+            "STR A, SP",
+            "LDR C, SP",
+            "ADD SP, #2",
+
+            "SUB SP, #2",
+            "STR B, SP",
+            "LDR A, SP",
+            "ADD SP, #2",
+
+            "SUB SP, #2",
+            "STR C, SP",
+            "LDR B, SP",
+            "ADD SP, #2",
+            "ADD M, #1",
+            "JMP #6",
+            "ADD FLAGS, #1",
+        };
+
+        let mut mem = LinearMemory::new(1024);
+        mem.as_read_only(100, 2); // defines addr 100 as readonly
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+        machine.set_register(Register::SP, 0x100);
         while let Ok(_) = machine.step() {
             //machine.print_regs();
             //println!("")

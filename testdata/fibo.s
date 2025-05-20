@@ -4,24 +4,37 @@ MOV B, #1
 MOV M, #0
 
 LOOP:
-GTE M, #10
+GTE M, #9
 CJP END
+
+JMP int_to_str
+return_to_loop:
+SUB SP, #2
+STR B, SP
+
+MOV B, #2
+MOV C, #482
+MSL C, [#2 #7]
+STR B, C
+
+LDR B, SP
+ADD SP, #2
 
 ADD A, B
 
 SUB SP, #2
 STR A, SP
-LDR SP, C
+LDR C, SP
 ADD SP, #2
 
 SUB SP, #2
 STR B, SP
-LDR SP, A
+LDR A, SP
 ADD SP, #2
 
 SUB SP, #2
 STR C, SP
-LDR SP, B
+LDR B, SP
 ADD SP, #2
 
 ADD M, #1
