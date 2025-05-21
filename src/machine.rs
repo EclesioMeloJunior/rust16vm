@@ -672,17 +672,20 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(_) = machine.step() {
-            machine.print_regs();
-        }
+        
+        machine.step().unwrap(); // MOV A, #1
 
+        machine.step().unwrap(); // EQ A, #1
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b1000);  // the FLAGS should be 0...101
+
+        machine.step().unwrap(); // EQ A, #2
         assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
     }
 
     #[test]
     fn run_factorial_algorithm() {
         let program = rv16asm! {
-            "MOV B, #9",
+            "MOV B, #8",
             "MOV A, #1",
 
             "LTE B, #1",
@@ -700,11 +703,8 @@ mod test {
 
         let mut machine = Machine::new(mem);
         while let Ok(_) = machine.step() {
-            //machine.print_regs();
-            //println!("")
         }
 
-        machine.print_regs();
-        //assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
+        assert_eq!(machine.registers[Register::A as usize], 40_320);
     }
 }
