@@ -4,6 +4,7 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 
 use rust16vm::devices::screen::ScreenOptions;
+use rust16vm::machine::State;
 use rust16vm::{
     devices::{keyboard::Keyboard, screen::ScreenDevice, terminal::Terminal256},
     machine::{Machine, Register},
@@ -143,5 +144,16 @@ pub fn main() -> () {
     // define the stack pointer to the memory end;
     machine.set_register(Register::SP, 0xFFFF);
 
-    while let Ok(_) = machine.step() {}
+
+    loop {
+        let r = machine.step();
+        match r {
+            Ok(State::Continue) => continue,
+            Ok(State::Stop) => break,
+            Err(err) => {
+                println!("error: {:?}", err);
+                break;
+            }
+        }
+    }
 }
