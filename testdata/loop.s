@@ -23,9 +23,9 @@ SUB SP, #2
 ; call int to  str
 SUB SP, #2
 STR A, SP
-JMP int_to_str
 
-return_to_loop:
+CALL int_to_str 
+
 LDR A, SP
 ADD SP, #2
 
@@ -70,7 +70,7 @@ ADD B, #1
 ; indicates end_of_text
 MOV A, #3
 STB A, B
-JMP return_to_loop
+RET
 
 int_to_str_bef_loop:
 MOV C, #0
@@ -171,47 +171,4 @@ MOV C, #3
 STB C, B
 
 ADD SP, #2
-JMP return_to_loop
-SUB SP, #2
-MOV B, #0 
-STR B, SP  
-
-loop:
-ADD SP, #2
-LDR B, SP 
-
-GT A, B 
-CJP end
-
-SUB SP, #2
-
-; call int to  str
-SUB SP, #2
-STR A, SP
-JMP int_to_str
-
-return_to_loop:
-LDR A, SP
-ADD SP, #2
-
-; flush the terminal
-MOV C, #2
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#1 #7]
-MSL B, [#0 #1]
-STB C, B
-
-ADD A, #1
-LDR C, SP
-ADD C, #1 
-
-; place cursor to the next line
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#0 #7]
-MSL B, [#1 #1]
-STR C, B
-STR C, SP
-
-JMP loop
+RET
