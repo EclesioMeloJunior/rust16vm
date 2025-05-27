@@ -291,8 +291,8 @@ impl<M: Addressable> Machine<M> {
 
         let inst = Instruction::try_from(raw)?;
         
-        //self.print_regs();
-        // println!("{:?} @ {}", inst, pc);
+        self.print_regs();
+        println!("{:?} @ {}", inst, pc);
 
         match inst {
             Instruction::Mov(dst_reg, imm) => {
@@ -505,7 +505,7 @@ mod test {
 
         let result = machine.step();
         assert!(result.is_err());
-        assert_eq!(Err(String::from("unexpected instruction: 0x0000")), result);
+        assert_eq!(Err(String::from("invalid instruction: Noop")), result);
     }
 
     #[test]
@@ -543,6 +543,7 @@ mod test {
                 }
 
                 let mut machine = Machine::new(mem);
+                machine.set_register(Register::SP, 8 * 1024);
                 for _i in 0..inst_len + 1 {
                     machine.step().unwrap();
                 }
@@ -588,14 +589,19 @@ mod test {
         run(vec![0b000010_0_11_000_0011], vec![(Register::A, 4)]);
 
         // MOV FL, #2
+        // SUB SP, #2
         // DIV A, #5 - with FLAGS
         let machine = run(
-            vec![0b000000010_111_0001, 0b000101_0_11_000_0011],
+            vec![
+                0b000000010_111_0001, 
+                0b000010_0_01_100_0011,
+                0b000101_0_11_000_0011,
+            ],
             vec![(Register::A, 1)],
         );
         let stored = machine
             .memory
-            .read2(machine.registers[Register::SP as usize] - 2_u16);
+            .read2(machine.registers[Register::SP as usize]);
 
         assert_eq!(stored.unwrap(), 3_u16);
 
@@ -607,11 +613,13 @@ mod test {
         );
 
         // MOV FL, #2
+        // SUB SP, #2
         // MOV B, #2
         // DIV A, B - with FLAGS
         let machine = run(
             vec![
                 0b000000010_111_0001,
+                0b000010_0_01_100_0011,
                 0b000000101_001_0001,
                 0b000_001_1_11_000_0011,
             ],
@@ -619,7 +627,7 @@ mod test {
         );
         let stored = machine
             .memory
-            .read2(machine.registers[Register::SP as usize] - 2_u16);
+            .read2(machine.registers[Register::SP as usize]);
 
         assert_eq!(stored.unwrap(), 3_u16);
     }
@@ -661,7 +669,7 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(_) = machine.step() {
+        while let Ok(State::Continue) = machine.step()  {
             machine.print_regs();
         }
         assert_eq!(machine.registers[Register::A as usize], 10);
@@ -680,7 +688,7 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(_) = machine.step() {
+        while let Ok(State::Continue) = machine.step()  {
             machine.print_regs();
         }
 
@@ -696,7 +704,6 @@ mod test {
         };
 
         let mut mem = LinearMemory::new(1024);
-        mem.as_read_only(100, 2); // defines addr 100 as readonly
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
@@ -726,11 +733,10 @@ mod test {
         };
 
         let mut mem = LinearMemory::new(1024);
-        mem.as_read_only(100, 2); // defines addr 100 as readonly
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(_) = machine.step() {
+        while let Ok(State::Continue) = machine.step()  {
         }
 
         assert_eq!(machine.registers[Register::A as usize], 40_320);
@@ -747,10 +753,7 @@ mod test {
             sum(1, 2);
             c := 55;
         }
-        */
-
-        println!("atestetes");
-        
+        */        
         let program = rv16asm! {
             "ADD A, B",
             "RET",
@@ -769,7 +772,6 @@ mod test {
         println!("{:?}", program);
 
         let mut mem = LinearMemory::new(1024);
-        mem.as_read_only(100, 2); // defines addr 100 as readonly
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
@@ -811,23 +813,27 @@ mod test {
             "STR C, SP",
             "LDR B, SP",
             "ADD SP, #2",
+
             "ADD M, #1",
             "JMP #6",
+            
             "ADD FLAGS, #1",
         };
 
         let mut mem = LinearMemory::new(1024);
-        mem.as_read_only(100, 2); // defines addr 100 as readonly
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        machine.set_register(Register::SP, 0x100);
-        while let Ok(_) = machine.step() {
-            //machine.print_regs();
-            //println!("")
+        machine.set_register(Register::SP, 1024);
+
+        while let Ok(State::Continue) = machine.step() {
         }
 
         machine.print_regs();
-        //assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
+        
+        assert_eq!(machine.registers[Register::A as usize], 34);
+        assert_eq!(machine.registers[Register::B as usize], 55);
+        assert_eq!(machine.registers[Register::M as usize], 9);
+        assert_eq!(machine.registers[Register::FLAGS as usize], 1) // the FLAGS should be 0...101
     }
 }
