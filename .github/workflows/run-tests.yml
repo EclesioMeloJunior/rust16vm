@@ -1,22 +1,19 @@
 on:
   pull_request:
 
-name: unit-tests
+name: rust-unit-tests
 
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions/setup-rust@v1
-        with:
-          rust-version: nightly
+      - name: Temporarily modify the rust toolchain version
+        run: rustup override set nightly
 
-      - name: Install dependencies
-        run: cargo fetch
+      - name: Build
+        run: cargo build --verbose
 
       - name: Run tests
-        run: cargo test --all
+        run: cargo test --verbose --all
