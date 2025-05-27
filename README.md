@@ -40,7 +40,7 @@ for (idx, inst) in program.iter().enumerate() {
 }
 
 let mut machine = Machine::new(mem);
-while let Ok(_) = machine.step() {
+while let Ok(State::Continue) = machine.step()  {
   machine.print_regs();
 }
 
