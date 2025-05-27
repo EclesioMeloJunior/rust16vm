@@ -1,6 +1,7 @@
 #[allow(dead_code)]
 use super::memory::Addressable;
 
+
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy, Eq, Ord)]
 #[repr(usize)]
 pub enum Register {
@@ -100,11 +101,6 @@ pub enum Instruction {
     // Format: 0001 | reg(3) | immediate(9)
     Mov(Register, u16),
 
-    // Copy a value stored in the first register to the
-    // address in the second register
-    // Format: 1001 | reg(3) | reg(3) | ...
-    Cpy(Register, Register),
-
     // Move with shift
     // Format: 0010 | reg(3) | shift_amt(3) | direction(1) | immediate(5)
     // direction 1 then shift left
@@ -124,6 +120,11 @@ pub enum Instruction {
     // Format: 1000 | reg(3) | reg(3) | type (1) | shift (5)
     LdbStb(Register, Register, bool, u8),
 
+      // Copy a value stored in the first register to the
+    // address in the second register
+    // Format: 1001 | reg(3) | reg(3) | ...
+    Cpy(Register, Register),
+
     // Set the PC to a specific memory address
     // Format: 0110 | mode (1) | [mode == 1]reg(3) | [mode == 0]imm(11)
     Jmp(Option<Register>, Option<u16>),
@@ -136,6 +137,10 @@ pub enum Instruction {
     // Compare a base register with another register or with an immediate
     // Foarmat: 0111 | reg (3) | cmp (3) | mode (1) | [mode == 1] reg(3), [mode == 0]imm(5)
     Cmp(Register, Option<Register>, Option<u16>, CompareOp),
+
+    // Jump to a specific address, but set the return instruction addr inside register RT
+    // Foarmat: 1011 | ret (1) | address (11)
+    CallRet(bool, u16),
 }
 
 impl TryFrom<u16> for Instruction {
@@ -243,6 +248,10 @@ impl TryFrom<u16> for Instruction {
                     CompareOp::try_from(cmp)?,
                 ))
             }
+            0b1011 => {
+                let is_ret= ((inst >> 4) & 0b1) == 1;
+                Ok(Instruction::CallRet(is_ret, (inst >> 5) as u16))
+            }
             _ => Err(format!("unexpected instruction: {:#06x}", inst)),
         }
     }
@@ -251,6 +260,12 @@ impl TryFrom<u16> for Instruction {
 pub struct Machine<M: Addressable> {
     registers: [u16; 8],
     memory: M,
+}
+
+#[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
+pub enum State {
+    Continue,
+    Stop
 }
 
 impl<M: Addressable> Machine<M> {
@@ -265,10 +280,10 @@ impl<M: Addressable> Machine<M> {
         self.registers[reg as usize] = value;
     }
 
-    pub fn step(&mut self) -> Result<(), String> {
+    pub fn step(&mut self) -> Result<State, String> {
         let halt = self.registers[Register::FLAGS as usize] & 0b1 == 1;
         if halt {
-            return Err(format!("machine halted!"));
+            return Ok(State::Stop);
         }
 
         let pc = self.registers[Register::PC as usize];
@@ -348,11 +363,11 @@ impl<M: Addressable> Machine<M> {
                 (Some(reg), None) => {
                     let addr = self.registers[reg as usize];
                     self.registers[Register::PC as usize] = addr;
-                    return Ok(());
+                    return Ok(State::Continue);
                 }
                 (None, Some(imm)) => {
                     self.registers[Register::PC as usize] = imm;
-                    return Ok(());
+                    return Ok(State::Continue);
                 }
                 _ => unreachable!(),
             },
@@ -367,11 +382,11 @@ impl<M: Addressable> Machine<M> {
                         (Some(reg), None) => {
                             let addr = self.registers[reg as usize];
                             self.registers[Register::PC as usize] = addr;
-                            return Ok(());
+                            return Ok(State::Continue);
                         }
                         (None, Some(imm)) => {
                             self.registers[Register::PC as usize] = imm;
-                            return Ok(());
+                            return Ok(State::Continue);
                         }
                         _ => unreachable!(),
                     }
@@ -387,11 +402,24 @@ impl<M: Addressable> Machine<M> {
                     _ => unreachable!(),
                 };
             }
+            Instruction::CallRet(is_ret, addr) => {
+                if is_ret {
+                    self.registers[Register::PC as usize] = self.registers[Register::M as usize];
+                    return Ok(State::Continue);
+                } 
+
+                let curr = self.registers[Register::PC as usize];
+
+                self.registers[Register::PC as usize] = addr;
+                self.registers[Register::M as usize] = curr + 2;
+
+                return Ok(State::Continue);
+            }
             _ => return Err(format!("invalid instruction: {:?}", inst)),
         }
 
         self.registers[Register::PC as usize] += 2;
-        Ok(())
+        Ok(State::Continue)
     }
 
     fn set_flags(&mut self, flags: u16) {
@@ -404,7 +432,7 @@ impl<M: Addressable> Machine<M> {
 
     fn is_flag_active(&mut self, idx: u16) -> bool {
         let flags = self.registers[Register::FLAGS as usize];
-        let extract_flag = (flags & (1 << idx));
+        let extract_flag = flags & (1 << idx);
         return extract_flag != 0;
     }
 
@@ -462,7 +490,7 @@ mod test {
     use std::usize;
 
     use crate::{
-        machine::Register,
+        machine::{Register, State},
         memory::{Addressable, LinearMemory},
         rv16asm,
     };
@@ -672,17 +700,20 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(_) = machine.step() {
-            machine.print_regs();
-        }
+        
+        machine.step().unwrap(); // MOV A, #1
 
+        machine.step().unwrap(); // EQ A, #1
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b1000);  // the FLAGS should be 0...101
+
+        machine.step().unwrap(); // EQ A, #2
         assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
     }
 
     #[test]
     fn run_factorial_algorithm() {
         let program = rv16asm! {
-            "MOV B, #9",
+            "MOV B, #8",
             "MOV A, #1",
 
             "LTE B, #1",
@@ -700,12 +731,58 @@ mod test {
 
         let mut machine = Machine::new(mem);
         while let Ok(_) = machine.step() {
-            //machine.print_regs();
-            //println!("")
         }
 
-        machine.print_regs();
-        //assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
+        assert_eq!(machine.registers[Register::A as usize], 40_320);
+    }
+
+    #[test]
+    fn call_to_another_label() {
+        /*
+        func sum(a, b int) int {
+            return a + b
+        }
+
+        func main() {
+            sum(1, 2);
+            c := 55;
+        }
+        */
+
+        println!("atestetes");
+        
+        let program = rv16asm! {
+            "ADD A, B",
+            "RET",
+            
+            "MOV C, #11",
+
+            "MOV A, #1",
+            "MOV B, #2",
+
+            "CALL #0",
+
+            "MOV C, #55",
+            "ADD FLAGS, #1"
+        };
+
+        println!("{:?}", program);
+
+        let mut mem = LinearMemory::new(1024);
+        mem.as_read_only(100, 2); // defines addr 100 as readonly
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+
+        machine.set_register(Register::PC, 6);
+
+        while let Ok(State::Continue) = machine.step() {
+        }
+        
+        assert_eq!(Ok(State::Stop), machine.step());
+        assert_eq!(machine.registers[Register::A as usize], 3);
+        assert_eq!(machine.registers[Register::B as usize], 2);
+        assert_eq!(machine.registers[Register::C as usize], 55);
     }
 
 
