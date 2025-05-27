@@ -716,7 +716,6 @@ mod test {
             "MOV B, #1",
             "MOV M, #0",
 
-            
             "GTE M, #9",
             "CJP #40",
             "ADD A, B",
