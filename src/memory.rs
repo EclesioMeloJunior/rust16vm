@@ -33,6 +33,9 @@ pub trait Addressable {
     fn write(&mut self, addr: u16, value: u8) -> bool;
 
     fn read2(&self, addr: u16) -> Option<u16> {
+        println!("VALOR NO END {} : {:?}", addr, self.read(addr));
+        println!("VALOR NO END {} : {:?}", addr + 1, self.read(addr + 1));
+
         self.read(addr).and_then(|lo| {
             self.read(addr + 1)
                 .map(|hi| (lo as u16) | ((hi as u16) << 8))
