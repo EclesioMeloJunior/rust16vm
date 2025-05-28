@@ -633,24 +633,24 @@ mod test {
     fn test_assembly_line() {
         let empty = HashMap::new();
 
-        // let input = "MOV A, #10";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(inst, Instruction::Mov(Register::A, 10));
+        let input = "MOV A, #10";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(inst, Instruction::Mov(Register::A, 10));
 
-        // let input = "MSL A, [#11 #4]";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(inst, Instruction::MovShift(Register::A, 4, true, 11));
+        let input = "MSL A, [#11 #4]";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(inst, Instruction::MovShift(Register::A, 4, true, 11));
 
-        // let input = "MSR B, [#15 #2]";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(inst, Instruction::MovShift(Register::B, 2, false, 15));
+        let input = "MSR B, [#15 #2]";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(inst, Instruction::MovShift(Register::B, 2, false, 15));
 
-        // let input = "ADD A, #10";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Arith(Register::A, None, Some(10), ArithmeticOp::Add)
-        // );
+        let input = "ADD A, #10";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::A, None, Some(10), ArithmeticOp::Add)
+        );
 
         let input = "SUB SP, #2";
         let inst = parse_assembly_line(input, &empty).unwrap();
@@ -659,102 +659,100 @@ mod test {
             Instruction::Arith(Register::SP, None, Some(2), ArithmeticOp::Sub)
         );
 
-        println!("{}", encode_instruction(&inst));
+        let input = "SUB B, SP";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::B, Some(Register::SP), None, ArithmeticOp::Sub)
+        );
 
-        // let input = "SUB B, SP";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Arith(Register::B, Some(Register::SP), None, ArithmeticOp::Sub)
-        // );
+        let input = "MUL C, #5";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::C, None, Some(5), ArithmeticOp::Mul)
+        );
 
-        // let input = "MUL C, #5";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Arith(Register::C, None, Some(5), ArithmeticOp::Mul)
-        // );
+        let input = "MUL A, B";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::A, Some(Register::B), None, ArithmeticOp::Mul)
+        );
 
-        // let input = "MUL A, B";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Arith(Register::A, Some(Register::B), None, ArithmeticOp::Mul)
-        // );
+        let input = "DIV M, #16";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::M, None, Some(16), ArithmeticOp::Div)
+        );
 
-        // let input = "DIV M, #16";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Arith(Register::M, None, Some(16), ArithmeticOp::Div)
-        // );
+        let input = "DIV BP, A";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::BP, Some(Register::A), None, ArithmeticOp::Div)
+        );
 
-        // let input = "DIV BP, A";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Arith(Register::BP, Some(Register::A), None, ArithmeticOp::Div)
-        // );
+        let input = "STR SP, A";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::LdrStr(Register::SP, Register::A, true, 0)
+        );
 
-        // let input = "STR SP, A";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::LdrStr(Register::SP, Register::A, true, 0)
-        // );
+        let input = "LDR C, [SP #4]";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::LdrStr(Register::C, Register::SP, false, 4)
+        );
 
-        // let input = "LDR C, [SP #4]";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::LdrStr(Register::C, Register::SP, false, 4)
-        // );
+        let input = "JMP #10";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(inst, Instruction::Jmp(None, Some(10)));
 
-        // let input = "JMP #10";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(inst, Instruction::Jmp(None, Some(10)));
+        let input = "JMP A";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(inst, Instruction::Jmp(Some(Register::A), None));
 
-        // let input = "JMP A";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(inst, Instruction::Jmp(Some(Register::A), None));
+        let input = "CJP #10";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(inst, Instruction::CondJmp(None, Some(10)));
 
-        // let input = "CJP #10";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(inst, Instruction::CondJmp(None, Some(10)));
+        let input = "EQ A, B";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Cmp(Register::A, Some(Register::B), None, CompareOp::Eq)
+        );
 
-        // let input = "EQ A, B";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Cmp(Register::A, Some(Register::B), None, CompareOp::Eq)
-        // );
+        let input = "LT A, #10";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Cmp(Register::A, None, Some(10), CompareOp::Less)
+        );
 
-        // let input = "LT A, #10";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Cmp(Register::A, None, Some(10), CompareOp::Less)
-        // );
+        let input = "ADD FLAGS, #1";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::FLAGS, None, Some(1), ArithmeticOp::Add)
+        );
 
-        // let input = "ADD FLAGS, #1";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::Arith(Register::FLAGS, None, Some(1), ArithmeticOp::Add)
-        // );
+        let input = "CALL #1024";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::CallRet(false, 1024)
+        );
 
-        // let input = "CALL #1024";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::CallRet(false, 1024)
-        // );
-
-        // let input = "RET";
-        // let inst = parse_assembly_line(input, &empty).unwrap();
-        // assert_eq!(
-        //     inst,
-        //     Instruction::CallRet(true, 0)
-        // );
+        let input = "RET";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::CallRet(true, 0)
+        );
     }
 }
