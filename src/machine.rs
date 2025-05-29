@@ -99,7 +99,7 @@ pub enum Instruction {
     Noop,
 
     // Format: 0001 | reg(3) | immediate(9)
-    Mov(Register, u16),
+    Mov(Register, Option<Register>, Option<u16>),
 
     // Move with shift
     // Format: 0010 | reg(3) | shift_amt(3) | direction(1) | immediate(5)
@@ -295,7 +295,7 @@ impl<M: Addressable> Machine<M> {
         println!("{:?} @ {}", inst, pc);
 
         match inst {
-            Instruction::Mov(dst_reg, imm) => {
+            Instruction::Mov(dst_reg, reg, imm) => {
                 self.registers[dst_reg as usize] = imm;
             }
             Instruction::MovShift(dst_reg, sh_am, left, imm) => {

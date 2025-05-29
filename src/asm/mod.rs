@@ -41,9 +41,20 @@ impl ToString for Instruction {
     fn to_string(&self) -> String {
         match self {
             Instruction::Noop => "NOOP".to_string(),
-            Instruction::Mov(reg, val) => {
-                format!("MOV {}, #{}", reg.to_string(), val.to_string())
+
+            Instruction::Mov(reg, Some(src_reg), None) => {
+                format!("MOV {}, {}", reg.to_string(), src_reg.to_string())
             }
+            Instruction::Mov(reg, None, Some(imm)) => {
+                format!("MOV {}, #{}", reg.to_string(), imm)
+            }
+            Instruction::Mov(reg, None, None) =>{
+                panic!()
+            }
+            Instruction::Mov(reg, Some(_), Some(_)) =>{
+                panic!()
+            }
+            
             Instruction::MovShift(reg, shift_amt, is_left, imm) => {
                 if *is_left {
                     format!("MSL {}, [#{} #{}]", reg.to_string(), shift_amt, imm)
@@ -152,10 +163,15 @@ impl ToString for Instruction {
 pub fn encode_instruction(inst: &Instruction) -> u16 {
     match inst {
         Instruction::Noop => 0,
-        Instruction::Mov(reg, imm) => {
+        Instruction::Mov(reg, opt_reg, opt_imm ) => {
             let reg_code = (*reg as u16) & 0b111;
-            let imm = imm & 0b111111111;
-            (imm << 7) | (reg_code << 4) | 0b0001
+            
+            let (src, flag) = if opt_reg.is_some(){
+                    ((opt_reg.unwrap() as u16) & 0b111, 1)
+            } else{
+                ((opt_imm.unwrap() as u16) & 0b11111111, 0)
+            };
+            (src << 8) | (flag<<7) |(reg_code << 4) | 0b0001
         }
         Instruction::MovShift(reg, sh_amt, left_shift, imm) => {
             let reg_code = (*reg as u16) & 0b111;
@@ -436,7 +452,9 @@ fn parse_jmp<'a>(
     }
 }
 
-fn parse_call<'a>(labels: &'a HashMap<String, u16>) -> impl Fn(&[&str]) -> Result<Instruction, AsmError>  {
+fn parse_call<'a>(
+    labels: &'a HashMap<String, u16>,
+) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
     move |args: &[&str]| -> Result<Instruction, AsmError> {
         if args.len() != 1 {
             return Err(AsmError::InvalidInstruction);
@@ -453,7 +471,7 @@ fn parse_call<'a>(labels: &'a HashMap<String, u16>) -> impl Fn(&[&str]) -> Resul
         };
 
         return Ok(Instruction::CallRet(false, addr));
-    }   
+    }
 }
 
 
