@@ -98,7 +98,7 @@ impl TryFrom<usize> for CompareOp {
 pub enum Instruction {
     Noop,
 
-    // Format: 0001 | reg(3) | immediate(9)
+    // Format: 0001 | reg(3) |flag(1) |[flag == 1]reg(3),[flag == 0]imm(8)
     Mov(Register, Option<Register>, Option<u16>),
 
     // Move with shift
@@ -152,8 +152,23 @@ impl TryFrom<u16> for Instruction {
             0b0000 => Ok(Instruction::Noop),
             0b0001 => {
                 let reg_dst = ((inst >> 4) & 0b111) as usize;
-                let imm = (inst >> 7) & 0b111111111;
-                return Ok(Instruction::Mov(Register::try_from(reg_dst)?, imm));
+                let is_reg = (inst >> 7) & 0b1 == 1;
+                if  is_reg{
+                    return Ok(
+                        Instruction::Mov(
+                            Register::try_from(reg_dst)?,
+                            Some(Register::try_from(((inst >> 8) & 0b111) as usize)?),
+                            None,
+                        ));
+                } else{
+                    return Ok(
+                        Instruction::Mov(
+                            Register::try_from(reg_dst)?,
+                            None,
+                            Some((inst >> 8) & 0b111111111),
+                        ));
+                }
+        
             }
             0b0010 => {
                 let reg_dst = ((inst >> 4) & 0b111) as usize;
@@ -296,7 +311,21 @@ impl<M: Addressable> Machine<M> {
 
         match inst {
             Instruction::Mov(dst_reg, reg, imm) => {
-                self.registers[dst_reg as usize] = imm;
+                match (reg, imm) {
+                    (Some(src_reg), None) => {
+                        let src_value = self.registers[src_reg as usize];
+                        self.registers[dst_reg as usize] = src_value;
+                    }
+                    (None, Some(imm_value)) => {
+                        self.registers[dst_reg as usize] = imm_value;
+                    }
+                    _=> {
+                        unreachable!();
+                    }
+                    
+                }
+                
+                
             }
             Instruction::MovShift(dst_reg, sh_am, left, imm) => {
                 let mut curr_value = self.registers[dst_reg as usize];
@@ -867,5 +896,30 @@ mod test {
         assert_eq!(machine.registers[Register::C as usize], 0);
         assert_eq!(machine.registers[Register::SP as usize], 100);
         assert_eq!(machine.registers[Register::FLAGS as usize], 0b11);
+    }
+
+
+
+    #[test]
+    fn test_mov_register(){
+        let program = rv16asm! {
+            "MOV A, #10",
+            "MOV B, A",
+            
+            "ADD FLAGS, #1",
+
+
+        };
+        let mut mem = LinearMemory::new(1024);
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+        machine.set_register(Register::SP, 100);
+
+        while let Ok(State::Continue) = machine.step() {
+        }
+        assert_eq!(machine.registers[Register::B as usize], 10);
+
+        machine.print_regs();
     }
 }
