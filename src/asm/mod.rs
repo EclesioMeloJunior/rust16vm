@@ -60,6 +60,9 @@ impl ToString for Instruction {
                     ArithmeticOp::Sub => "SUB",
                     ArithmeticOp::Mul => "MUL",
                     ArithmeticOp::Div => "DIV",
+                    ArithmeticOp::Mod => "MOD",
+                    ArithmeticOp::Exp => "EXP",
+                    ArithmeticOp::Sqrt => "SQRT"
                 };
 
                 let operand = match (opt_reg, opt_imm) {
@@ -173,6 +176,9 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
                 ArithmeticOp::Sub => 0b01,
                 ArithmeticOp::Mul => 0b10,
                 ArithmeticOp::Div => 0b11,
+                ArithmeticOp::Mod => 0b100,
+                ArithmeticOp::Exp => 0b101,
+                ArithmeticOp::Sqrt => 0b110,
             };
 
             let (src, rhs) = match (opt_src_reg, opt_imm) {
@@ -182,6 +188,9 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
             };
 
             (rhs << 10) | (src << 9) | (op << 7) | (reg_code << 4) | 0b0011
+        }
+        Instruction::ArithRegReg(dsr_reg, fst_reg, snd_reg , op) => {
+            
         }
         Instruction::LdrStr(r0, addr_reg, is_str, shift) => {
             let r0_code = (*r0 as u16) & 0b111;
@@ -345,12 +354,12 @@ pub fn parse_assembly_line<'a>(
         "MOV" => Box::new(parse_mov),
         "MSL" => Box::new(parse_mov_shift(true)),
         "MSR" => Box::new(parse_mov_shift(false)),
-
         "CPY" => Box::new(parse_copy),
         "ADD" => Box::new(parse_arithmetic(ArithmeticOp::Add)),
         "SUB" => Box::new(parse_arithmetic(ArithmeticOp::Sub)),
         "MUL" => Box::new(parse_arithmetic(ArithmeticOp::Mul)),
         "DIV" => Box::new(parse_arithmetic(ArithmeticOp::Div)),
+        "MOD" => Box::new(parse_arithmetic(op:ArithmeticOp::Mod)),
         "LDR" => Box::new(parse_ldr_str(false, false)),
         "STR" => Box::new(parse_ldr_str(false, true)),
         "LDB" => Box::new(parse_ldr_str(true, false)),

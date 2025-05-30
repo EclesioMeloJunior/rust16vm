@@ -15,7 +15,7 @@ A 16bit virtual machine with 8 registers.
 The VM uses 16bit wide instructions, loaded previusly at the memory, each instruction occupies 2 bytes in memory. It executes a naive fetch/decode/executes loop.
 
 Register A, B and C are General Purpose registers.
-Register M, SP, BP, PC, FLAGS are reserved.
+Register M, SP, ,BP PC, FLAGS are reserved.
 
 ### A simple for loop
 
@@ -115,6 +115,14 @@ Ex:
   OR FLAGS, #2 //sets the bit at position 1 to be `1`
   DIV A, B     // performs the division
   LDR SP, C    // gets from the stack the module and store in C
+
+#### EXP
+To calculate the exponentiation (Aⁿ), you should set the bit at position 1 of the FLAGS register to 1 and then perform the multiplication instruction. The result of the exponentiation will be placed on the stack.
+Ex: 
+  
+
+#### SQRT
+To calculate the square root (√A), you should set the bit at position 1 of the FLAGS register to 1 and then perform the SQRT instruction. The result of the square root will be placed on the stack.
 
 #### CPY {from_register} {to_register}
 Copies a value from a memory address inside another memory address.
