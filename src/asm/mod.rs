@@ -695,7 +695,12 @@ mod test {
             Instruction::Arith(Register::SP, None, Some(2), ArithmeticOp::Sub)
         );
 
-        println!("{}", encode_instruction(&inst));
+        let input = "SUB B, SP";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::B, Some(Register::SP), None, ArithmeticOp::Sub)
+        );
 
         // let input = "SUB B, SP";
         // let inst = parse_assembly_line(input, &empty).unwrap();

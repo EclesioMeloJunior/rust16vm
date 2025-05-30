@@ -336,6 +336,7 @@ impl<M: Addressable> Machine<M> {
                         self.set_flags((0b1 << 2) | 0b1);
                     }
                 } else {
+                    println!("ONDE ESTOU LENDO: {}", at);
                     if let Some(value) = self.memory.read2(at) {
                         self.registers[r0 as usize] = value;
                     }
@@ -446,7 +447,7 @@ impl<M: Addressable> Machine<M> {
                 let store_mod = (self.registers[Register::FLAGS as usize] >> 1) & 0b1 == 1;
                 if store_mod {
                     self.memory
-                        .write2(self.registers[Register::SP as usize], lhs % imm);
+                        .write(self.registers[Register::SP as usize], (lhs % imm) as u8);
                 }
                 lhs / imm
             }
@@ -835,5 +836,36 @@ mod test {
         assert_eq!(machine.registers[Register::B as usize], 55);
         assert_eq!(machine.registers[Register::M as usize], 9);
         assert_eq!(machine.registers[Register::FLAGS as usize], 1) // the FLAGS should be 0...101
+    }
+
+    #[test]
+    fn test_mod_operation() {
+        let program = rv16asm! {
+            "MOV A, #24",
+
+            "ADD FLAGS, #2",
+            
+            "SUB SP, #1",
+            "DIV A, #12",
+            "LDB C, SP",
+            "ADD SP, #1",
+
+            "ADD FLAGS, #1",
+        };
+        let mut mem = LinearMemory::new(1024);
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+        machine.set_register(Register::SP, 100);
+
+        while let Ok(State::Continue) = machine.step() {
+        }
+
+        machine.print_regs();
+
+        assert_eq!(machine.registers[Register::A as usize], 2);
+        assert_eq!(machine.registers[Register::C as usize], 0);
+        assert_eq!(machine.registers[Register::SP as usize], 100);
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b11);
     }
 }
