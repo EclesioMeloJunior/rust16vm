@@ -141,6 +141,13 @@ impl ToString for Instruction {
 
                 format!("{} {}, {}", op.to_string(), reg.to_string(), operand)
             }
+            Instruction::CallRet(is_ret, addr) => {
+                if *is_ret {
+                    return "RET".to_string();
+                }
+
+                format!("CALL #{}", addr.to_string())
+            }
         }
     }
 }
@@ -240,6 +247,12 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
             };
             (value << 11) | (mode << 10) | (cmp << 7) | (r0 << 4) | 0b0111
         }
+        Instruction::CallRet(is_ret, addr) => {
+            let imm = *addr & 0b11111111111;
+            let flag = if *is_ret { 0b1 } else { 0b0 };
+
+            (imm << 5) | ((flag & 0b1) << 4) | 0b1011
+        },
     }
 }
 
@@ -335,6 +348,7 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
 }
 
 pub fn encode_instructions(instructions: &[Instruction]) -> Vec<u16> {
+
     instructions.iter().map(encode_instruction).collect()
 }
 
@@ -372,6 +386,9 @@ pub fn parse_assembly_line<'a>(
         "LTE" => Box::new(parse_comparision(CompareOp::LessEq)),
         "GT" => Box::new(parse_comparision(CompareOp::Greater)),
         "GTE" => Box::new(parse_comparision(CompareOp::GreaterEq)),
+
+        "RET" => Box::new(parse_ret),
+        "CALL" => Box::new(parse_call(labels)),
         _ => return Err(AsmError::InvalidInstruction),
     };
 
@@ -427,6 +444,27 @@ fn parse_jmp<'a>(
         Ok(Instruction::Jmp(opt_reg, opt_imm))
     }
 }
+
+fn parse_call<'a>(labels: &'a HashMap<String, u16>) -> impl Fn(&[&str]) -> Result<Instruction, AsmError>  {
+    move |args: &[&str]| -> Result<Instruction, AsmError> {
+        if args.len() != 1 {
+            return Err(AsmError::InvalidInstruction);
+        }
+
+        let addr = if args[0].starts_with("#") {
+            parse_immediate(args[0])?
+        } else {
+            if let Some(jmp_addr) = labels.get(args[0]) {
+                *jmp_addr
+            } else {
+                return Err(AsmError::UnresolvedLabel(args[0].to_string()));
+            }
+        };
+
+        return Ok(Instruction::CallRet(false, addr));
+    }   
+}
+
 
 // LDR A, [B, #4]
 fn parse_ldr_str(is_byte: bool, is_str: bool) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
@@ -518,6 +556,10 @@ fn parse_copy(args: &[&str]) -> Result<Instruction, AsmError> {
     Ok(Instruction::Cpy(src_reg, dst_reg))
 }
 
+fn parse_ret(_args: &[&str]) -> Result<Instruction, AsmError> {
+    return Ok(Instruction::CallRet(true, 0));
+}
+
 fn parse_mov(args: &[&str]) -> Result<Instruction, AsmError> {
     if args.len() != 2 {
         return Err(AsmError::InvalidInstruction);
@@ -586,6 +628,14 @@ mod test {
         let ldr = Instruction::LdrStr(Register::B, Register::A, false, 10);
         let inst = encode_instruction(&ldr);
         assert_eq!(0b0101000000010100, inst);
+
+        let call = Instruction::CallRet(false, 10);
+        let inst = encode_instruction(&call);
+        assert_eq!(0b0000000101001011, inst);
+
+        let ret = Instruction::CallRet(true, 0);
+        let inst = encode_instruction(&ret);
+        assert_eq!(0b0000000000011011, inst);
     }
 
     #[test]
@@ -609,6 +659,13 @@ mod test {
         assert_eq!(
             inst,
             Instruction::Arith(Register::A, None, Some(10), ArithmeticOp::Add)
+        );
+
+        let input = "SUB SP, #2";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::SP, None, Some(2), ArithmeticOp::Sub)
         );
 
         let input = "SUB B, SP";
@@ -684,6 +741,27 @@ mod test {
         assert_eq!(
             inst,
             Instruction::Cmp(Register::A, None, Some(10), CompareOp::Less)
+        );
+
+        let input = "ADD FLAGS, #1";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::Arith(Register::FLAGS, None, Some(1), ArithmeticOp::Add)
+        );
+
+        let input = "CALL #1024";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::CallRet(false, 1024)
+        );
+
+        let input = "RET";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::CallRet(true, 0)
         );
     }
 }

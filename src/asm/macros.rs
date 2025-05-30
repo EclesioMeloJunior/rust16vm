@@ -14,7 +14,7 @@ macro_rules! rv16asm {
         use $crate::asm::{parse_assembly, encode_instructions};
         let code = concat!($($inst, "\n"),*);
         let instructions = parse_assembly(code)
-            .expect(&format!("failed to parse asm: {}", code));
+            .expect(&format!("failed to parse asm:\n{}", code));
 
         encode_instructions(&instructions)
     }};

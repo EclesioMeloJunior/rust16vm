@@ -1,65 +1,73 @@
-; hold the iteration index
-MOV A, #100
+MOV A, #0
+MOV B, #1
 
-; hold the limit
+MOV M, #0
+
+LOOP:
+GTE M, #11
+CJP END
+
+; salvando os registradores A e B na stack 
 SUB SP, #2
-MOV B, #115
 STR B, SP
-
-; hold the iteration index
-SUB SP, #2
-MOV B, #0 
-STR B, SP  
-
-loop:
-ADD SP, #2
-LDR B, SP 
-
-GT A, B 
-CJP end
-
-SUB SP, #2
-
-; call int to  str
 SUB SP, #2
 STR A, SP
 
-CALL int_to_str 
+JMP int_to_str
 
+return_to_loop:
+
+; Mostrar numero no terminal
+MOV B, #2
+MOV C, #482
+MSL C, [#2 #7]
+STR B, C
+
+; Mover o cursor para a proxima linha
+MOV C, #482
+MSL C, [#1 #7]
+LDB B, C
+ADD B, #1
+STB B, C
+
+; Restaurando os registradores A e B da stack
+LDR A, SP
+ADD SP, #2
+LDR B, SP
+ADD SP, #2 
+
+ADD A, B
+
+SUB SP, #2
+STR A, SP
+LDR C, SP
+ADD SP, #2
+
+SUB SP, #2
+STR B, SP
 LDR A, SP
 ADD SP, #2
 
-; flush the terminal
-MOV C, #2
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#1 #7]
-MSL B, [#0 #1]
-STB C, B
-
-ADD A, #1
-LDR C, SP
-ADD C, #1 
-
-; place cursor to the next line
-MOV B, #0x0F
-MSL B, [#1 #4]
-MSL B, [#0 #7]
-MSL B, [#1 #1]
-STR C, B
+SUB SP, #2
 STR C, SP
+LDR B, SP
+ADD SP, #2
 
-JMP loop
+ADD M, #1
 
-end:
+JMP LOOP
+
+END:
 ADD FLAGS, #1
+
 
 ; get the algarism, sum to 48
 ; to get the correct ascii repr
 ; and place in the buffer
 int_to_str:
-GTE A, #10
+GT A, #9
 CJP int_to_str_bef_loop
+
 
 MOV B, #0x0F
 MSL B, [#0 #7]
@@ -70,7 +78,7 @@ ADD B, #1
 ; indicates end_of_text
 MOV A, #3
 STB A, B
-RET
+JMP return_to_loop
 
 int_to_str_bef_loop:
 MOV C, #0
@@ -171,4 +179,5 @@ MOV C, #3
 STB C, B
 
 ADD SP, #2
-RET
+JMP return_to_loop
+ 

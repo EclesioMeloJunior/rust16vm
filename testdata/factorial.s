@@ -9,9 +9,14 @@ SUB B, #1
 JMP loop
 
 END:
+<<<<<<< HEAD
 JMP int_to_str
 
 return_to_loop:
+=======
+CALL int_to_str
+
+>>>>>>> main
 MOV A, #2
 MOV B, #482
 MSL B, [#2 #7]
@@ -19,6 +24,12 @@ STR A, B
 
 ADD FLAGS, #1
 
+<<<<<<< HEAD
+=======
+
+; ========= INT_TO_STRING =========
+;
+>>>>>>> main
 ; get the algarism, sum to 48
 ; to get the correct ascii repr
 ; and place in the buffer
@@ -36,7 +47,11 @@ ADD B, #1
 ; indicates end_of_text
 MOV A, #3
 STB A, B
+<<<<<<< HEAD
 JMP return_to_loop
+=======
+RET
+>>>>>>> main
 
 int_to_str_bef_loop:
 MOV C, #0
@@ -137,6 +152,7 @@ MOV C, #3
 STB C, B
 
 ADD SP, #2
+<<<<<<< HEAD
 JMP return_to_loop
 SUB SP, #2
 MOV B, #0 
@@ -181,3 +197,8 @@ STR C, B
 STR C, SP
 
 JMP loop
+=======
+RET
+
+; ========= INT_TO_STRING =========
+>>>>>>> main

@@ -146,7 +146,7 @@ pub fn main() -> () {
 
     loop {}
 
-    while let Ok(_) = machine.step() {}
+    while let Ok(State::Continue) = machine.step()  {}
 }
 
 struct DebugManager {
