@@ -176,10 +176,17 @@ impl TryFrom<u16> for Instruction {
                 ));
             }
             0b1011 => {
-                let reg_dst = ((inst >> 4) & 0b111) as usize;
-                let op: usize = ((inst >> 7) & 0b111) as usize;
-                let fst_reg: usize = ((inst >> 10) & 0b111) as usize;
-                let snd_reg: usize = ((inst >> 13) & 0b111) as usize; 
+                 let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
+                let op: ArithmeticOp = match (inst >> 7) & 0b111 {
+                    0b100 => ArithmeticOp::Mod,
+                    0b101 => ArithmeticOp::Exp,
+                    0b110 => ArithmeticOp::Sqrt,
+                    _ => unreachable!(),
+                };
+                let fst_reg =  Register::try_from(((inst >> 10) & 0b111) as usize)?;
+                let snd_reg = Register::try_from(((inst >> 13) & 0b111) as usize)?; 
+
+                return Ok(Instruction::ArithRegReg(reg_dst, fst_reg, snd_reg, op));
             }
             0b1001 => {
                 let reg_src = ((inst >> 4) & 0b111) as usize;
@@ -197,6 +204,7 @@ impl TryFrom<u16> for Instruction {
                     0b10 => ArithmeticOp::Mul,
                     0b11 => ArithmeticOp::Div,
                     _ => unreachable!(),
+                    //0-00-000-0000
                 };
 
                 let uses_reg_as_input = (inst >> 9) & 0b1 == 1;
@@ -465,6 +473,7 @@ impl<M: Addressable> Machine<M> {
                 }
                 lhs / imm
             }
+            _ => unreachable!(),
         };
         self.registers[dst_reg as usize] = result;
     }
@@ -479,9 +488,9 @@ impl<M: Addressable> Machine<M> {
             ArithmeticOp::Sub => lhs - rhs,
             ArithmeticOp::Mul => lhs * rhs,
             ArithmeticOp::Div => lhs / rhs,
-            ArithmeticOp::Exp => lhs.pow(rhs),
+            ArithmeticOp::Exp => lhs.pow(rhs as u32) as u16,
             // TODO: A raiz quadrada só usa o valor do primeiro registrador
-            ArithmeticOp:: Sqrt => (lhs as f32).sqrt()
+            ArithmeticOp::Sqrt => (lhs as f32).sqrt() as u16
         };
         self.registers[dst_reg as usize] = result
     }

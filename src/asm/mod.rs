@@ -60,9 +60,7 @@ impl ToString for Instruction {
                     ArithmeticOp::Sub => "SUB",
                     ArithmeticOp::Mul => "MUL",
                     ArithmeticOp::Div => "DIV",
-                    ArithmeticOp::Mod => "MOD",
-                    ArithmeticOp::Exp => "EXP",
-                    ArithmeticOp::Sqrt => "SQRT"
+                    _ => unreachable!(),
                 };
 
                 let operand = match (opt_reg, opt_imm) {
@@ -72,6 +70,19 @@ impl ToString for Instruction {
                 };
 
                 format!("{} {}, {}", op.to_string(), reg.to_string(), operand)
+            } 
+            Instruction::ArithRegReg(dst_reg, fst_reg, snd_reg, op) => {
+                let op = match op {
+                    ArithmeticOp::Add => "ADDR",
+                    ArithmeticOp::Sub => "SUBR",
+                    ArithmeticOp::Mul => "MULR",
+                    ArithmeticOp::Div => "DIVR",
+                    ArithmeticOp::Mod => "MODR",
+                    ArithmeticOp::Exp => "EXPR",
+                    ArithmeticOp::Sqrt => "SQRTR",
+                };
+
+                format!("{} {}, {}, {}", op.to_string(), dst_reg.to_string(), fst_reg.to_string(), snd_reg.to_string())
             }
             Instruction::LdrStr(reg, rhs_reg, is_str, shift) => {
                 let op = if *is_str { "STR" } else { "LDR" };
@@ -183,9 +194,7 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
                 ArithmeticOp::Sub => 0b01,
                 ArithmeticOp::Mul => 0b10,
                 ArithmeticOp::Div => 0b11,
-                ArithmeticOp::Mod => 0b100,
-                ArithmeticOp::Exp => 0b101,
-                ArithmeticOp::Sqrt => 0b110,
+                _ => unreachable!(),
             };
 
             let (src, rhs) = match (opt_src_reg, opt_imm) {
@@ -193,11 +202,24 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
                 (None, Some(imm)) => (0b0, imm & 0b111111),
                 _ => unreachable!(),
             };
-
+            
             (rhs << 10) | (src << 9) | (op << 7) | (reg_code << 4) | 0b0011
         }
-        Instruction::ArithRegReg(dsr_reg, fst_reg, snd_reg , op) => {
-            
+        Instruction::ArithRegReg(dst_reg, fst_reg, snd_reg , op) => {
+            let reg_code: u16 = (*dst_reg as u16) & 0b111; 
+            let op: u16 = match op {
+                ArithmeticOp::Add => 0b000,
+                ArithmeticOp::Sub => 0b001,
+                ArithmeticOp::Mul => 0b010,
+                ArithmeticOp::Div => 0b011,
+                ArithmeticOp::Mod => 0b100,
+                ArithmeticOp::Exp => 0b101,
+                ArithmeticOp::Sqrt => 0b110,
+            }; 
+            // Format: 1011 | dst_reg(3) | op(3) | fst_reg(3) | snd_reg(3)
+            let fst_code: u16 = (*fst_reg as u16) & 0b111;
+            let snd_code: u16 = (*snd_reg as u16) & 0b111;
+            (snd_code << 13) | (fst_code << 10) | (op << 7) | (reg_code << 4) | 0b1011 
         }
         Instruction::LdrStr(r0, addr_reg, is_str, shift) => {
             let r0_code = (*r0 as u16) & 0b111;
@@ -373,7 +395,9 @@ pub fn parse_assembly_line<'a>(
         "SUB" => Box::new(parse_arithmetic(ArithmeticOp::Sub)),
         "MUL" => Box::new(parse_arithmetic(ArithmeticOp::Mul)),
         "DIV" => Box::new(parse_arithmetic(ArithmeticOp::Div)),
-        "MOD" => Box::new(parse_arithmetic(op:ArithmeticOp::Mod)),
+        "MOD" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Mod)),
+        "EXP" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Exp)),
+        "SQR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Sqrt)),
         "LDR" => Box::new(parse_ldr_str(false, false)),
         "STR" => Box::new(parse_ldr_str(false, true)),
         "LDB" => Box::new(parse_ldr_str(true, false)),
@@ -526,6 +550,20 @@ fn parse_arithmetic(op: ArithmeticOp) -> impl Fn(&[&str]) -> Result<Instruction,
                 op,
             ))
         }
+    }
+}
+
+fn parse_arithmetic_reg_reg(op: ArithmeticOp) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> { 
+    move |args: &[&str]| -> Result<Instruction, AsmError> {
+        if args.len() != 3 {
+            return Err(AsmError::InvalidInstruction);
+        }
+
+        let dst_reg = args[0].trim_end_matches(',').parse::<Register>()?;
+        let fst_reg = args[1].trim_end_matches(',').parse::<Register>()?;
+        let snd_reg = args[2].parse::<Register>()?;
+
+        Ok(Instruction::ArithRegReg(dst_reg, fst_reg, snd_reg, op))
     }
 }
 
@@ -763,5 +801,11 @@ mod test {
             inst,
             Instruction::CallRet(true, 0)
         );
+        let input = "ADDR C, A, B";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(
+            inst,
+            Instruction::ArithRegReg(Register::C, Register::A, Register::B, ArithmeticOp::Add)
+        )
     }
 }
