@@ -119,7 +119,9 @@ Ex:
 #### EXP
 To calculate the exponentiation (Aⁿ), you should set the bit at position 1 of the FLAGS register to 1 and then perform the multiplication instruction. The result of the exponentiation will be placed on the stack.
 Ex: 
-  
+  OR FLAGS, #2  
+  MUL A, B       
+  LDR SP, C  
 
 #### SQRT
 To calculate the square root (√A), you should set the bit at position 1 of the FLAGS register to 1 and then perform the SQRT instruction. The result of the square root will be placed on the stack.
