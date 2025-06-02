@@ -119,6 +119,9 @@ Ex:
 #### EXP
 To calculate the exponentiation (Aⁿ), you should set the bit at position 1 of the FLAGS register to 1 and then perform the multiplication instruction. The result of the exponentiation will be placed on the stack.
 Ex: 
+  MOV A, #2
+  MOV B, #5
+
   OR FLAGS, #2  
   MUL A, B       
   LDR SP, C  

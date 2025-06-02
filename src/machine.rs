@@ -1,7 +1,6 @@
 #[allow(dead_code)]
 use super::memory::Addressable;
 
-
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy, Eq, Ord)]
 #[repr(usize)]
 pub enum Register {
@@ -116,8 +115,8 @@ pub enum Instruction {
     Arith(Register, Option<Register>, Option<u16>, ArithmeticOp),
 
     // Executes one of the arithmetic operations (add, sub, mul, div, mod, exp, sqrt)
-    // Format: 1011 | dst_reg(3) | op(3) | src_1reg(3) | src2_reg(3)  
-    // op: 000 (add) 001 (sub) 010 (mul) 011 (div) 100 (mod) 101 (exp) 110 (sqrt) 
+    // Format: 1011 | dst_reg(3) | op(3) | src_1reg(3) | src2_reg(3)
+    // op: 000 (add) 001 (sub) 010 (mul) 011 (div) 100 (mod) 101 (exp) 110 (sqrt)
     ArithRegReg(Register, Register, Register, ArithmeticOp),
 
     // Load or Store a u16 the register value in the memory
@@ -128,7 +127,7 @@ pub enum Instruction {
     // Format: 1000 | reg(3) | reg(3) | type (1) | shift (5)
     LdbStb(Register, Register, bool, u8),
 
-      // Copy a value stored in the first register to the
+    // Copy a value stored in the first register to the
     // address in the second register
     // Format: 1001 | reg(3) | reg(3) | ...
     Cpy(Register, Register),
@@ -176,15 +175,15 @@ impl TryFrom<u16> for Instruction {
                 ));
             }
             0b1011 => {
-                 let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
+                let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
                 let op: ArithmeticOp = match (inst >> 7) & 0b111 {
                     0b100 => ArithmeticOp::Mod,
                     0b101 => ArithmeticOp::Exp,
                     0b110 => ArithmeticOp::Sqrt,
                     _ => unreachable!(),
                 };
-                let fst_reg =  Register::try_from(((inst >> 10) & 0b111) as usize)?;
-                let snd_reg = Register::try_from(((inst >> 13) & 0b111) as usize)?; 
+                let fst_reg = Register::try_from(((inst >> 10) & 0b111) as usize)?;
+                let snd_reg = Register::try_from(((inst >> 13) & 0b111) as usize)?;
 
                 return Ok(Instruction::ArithRegReg(reg_dst, fst_reg, snd_reg, op));
             }
@@ -271,7 +270,7 @@ impl TryFrom<u16> for Instruction {
                 ))
             }
             0b1011 => {
-                let is_ret= ((inst >> 4) & 0b1) == 1;
+                let is_ret = ((inst >> 4) & 0b1) == 1;
                 Ok(Instruction::CallRet(is_ret, (inst >> 5) as u16))
             }
             _ => Err(format!("unexpected instruction: {:#06x}", inst)),
@@ -287,7 +286,7 @@ pub struct Machine<M: Addressable> {
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 pub enum State {
     Continue,
-    Stop
+    Stop,
 }
 
 impl<M: Addressable> Machine<M> {
@@ -312,7 +311,7 @@ impl<M: Addressable> Machine<M> {
         let raw = self.memory.read2(pc).unwrap();
 
         let inst = Instruction::try_from(raw)?;
-        
+
         self.print_regs();
         println!("{:?} @ {}", inst, pc);
 
@@ -429,7 +428,7 @@ impl<M: Addressable> Machine<M> {
                 if is_ret {
                     self.registers[Register::PC as usize] = self.registers[Register::M as usize];
                     return Ok(State::Continue);
-                } 
+                }
 
                 let curr = self.registers[Register::PC as usize];
 
@@ -478,10 +477,16 @@ impl<M: Addressable> Machine<M> {
         self.registers[dst_reg as usize] = result;
     }
 
-    fn arithmetic_op_reg_reg(&mut self, dst_reg: Register, fst_reg: Register, snd_reg: Register, op: ArithmeticOp) { 
+    fn arithmetic_op_reg_reg(
+        &mut self,
+        dst_reg: Register,
+        fst_reg: Register,
+        snd_reg: Register,
+        op: ArithmeticOp,
+    ) {
         let lhs: u16 = self.registers[fst_reg as usize];
         let rhs: u16 = self.registers[snd_reg as usize];
-        
+
         let result: u16 = match op {
             ArithmeticOp::Mod => lhs % rhs,
             ArithmeticOp::Add => lhs + rhs,
@@ -490,7 +495,7 @@ impl<M: Addressable> Machine<M> {
             ArithmeticOp::Div => lhs / rhs,
             ArithmeticOp::Exp => lhs.pow(rhs as u32) as u16,
             // TODO: A raiz quadrada só usa o valor do primeiro registrador
-            ArithmeticOp::Sqrt => (lhs as f32).sqrt() as u16
+            ArithmeticOp::Sqrt => (lhs as f32).sqrt() as u16,
         };
         self.registers[dst_reg as usize] = result
     }
@@ -508,7 +513,7 @@ impl<M: Addressable> Machine<M> {
         if is_true {
             self.set_flags(1 << 3);
         } else if self.is_flag_active(3) {
-            self.remove_flags(1 << 3);            
+            self.remove_flags(1 << 3);
         }
     }
 
@@ -633,7 +638,7 @@ mod test {
         // DIV A, #5 - with FLAGS
         let machine = run(
             vec![
-                0b000000010_111_0001, 
+                0b000000010_111_0001,
                 0b000010_0_01_100_0011,
                 0b000101_0_11_000_0011,
             ],
@@ -709,7 +714,7 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(State::Continue) = machine.step()  {
+        while let Ok(State::Continue) = machine.step() {
             machine.print_regs();
         }
         assert_eq!(machine.registers[Register::A as usize], 10);
@@ -728,7 +733,7 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(State::Continue) = machine.step()  {
+        while let Ok(State::Continue) = machine.step() {
             machine.print_regs();
         }
 
@@ -737,7 +742,7 @@ mod test {
 
     #[test]
     fn should_change_flags() {
-         let program = rv16asm! {
+        let program = rv16asm! {
             "MOV A, #1",
             "EQ A, #1",
             "EQ A, #2",
@@ -747,11 +752,11 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        
+
         machine.step().unwrap(); // MOV A, #1
 
         machine.step().unwrap(); // EQ A, #1
-        assert_eq!(machine.registers[Register::FLAGS as usize], 0b1000);  // the FLAGS should be 0...101
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b1000); // the FLAGS should be 0...101
 
         machine.step().unwrap(); // EQ A, #2
         assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
@@ -776,8 +781,7 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(State::Continue) = machine.step()  {
-        }
+        while let Ok(State::Continue) = machine.step() {}
 
         assert_eq!(machine.registers[Register::A as usize], 40_320);
     }
@@ -793,11 +797,11 @@ mod test {
             sum(1, 2);
             c := 55;
         }
-        */        
+        */
         let program = rv16asm! {
             "ADD A, B",
             "RET",
-            
+
             "MOV C, #11",
 
             "MOV A, #1",
@@ -818,15 +822,13 @@ mod test {
 
         machine.set_register(Register::PC, 6);
 
-        while let Ok(State::Continue) = machine.step() {
-        }
-        
+        while let Ok(State::Continue) = machine.step() {}
+
         assert_eq!(Ok(State::Stop), machine.step());
         assert_eq!(machine.registers[Register::A as usize], 3);
         assert_eq!(machine.registers[Register::B as usize], 2);
         assert_eq!(machine.registers[Register::C as usize], 55);
     }
-
 
     #[test]
     fn run_fibonacci_algorithm() {
@@ -856,7 +858,7 @@ mod test {
 
             "ADD M, #1",
             "JMP #6",
-            
+
             "ADD FLAGS, #1",
         };
 
@@ -866,11 +868,10 @@ mod test {
         let mut machine = Machine::new(mem);
         machine.set_register(Register::SP, 1024);
 
-        while let Ok(State::Continue) = machine.step() {
-        }
+        while let Ok(State::Continue) = machine.step() {}
 
         machine.print_regs();
-        
+
         assert_eq!(machine.registers[Register::A as usize], 34);
         assert_eq!(machine.registers[Register::B as usize], 55);
         assert_eq!(machine.registers[Register::M as usize], 9);
@@ -883,7 +884,7 @@ mod test {
             "MOV A, #24",
 
             "ADD FLAGS, #2",
-            
+
             "SUB SP, #1",
             "DIV A, #12",
             "LDB C, SP",
@@ -897,8 +898,7 @@ mod test {
         let mut machine = Machine::new(mem);
         machine.set_register(Register::SP, 100);
 
-        while let Ok(State::Continue) = machine.step() {
-        }
+        while let Ok(State::Continue) = machine.step() {}
 
         machine.print_regs();
 
@@ -907,69 +907,15 @@ mod test {
         assert_eq!(machine.registers[Register::SP as usize], 100);
         assert_eq!(machine.registers[Register::FLAGS as usize], 0b11);
     }
-        #[test]
-    fn run_fibo() {
-        let program = rv16asm! {
-            //Inicializando os registradores
-            "MOV A, #0",
-            "MOV B, #1",
-            "MOV M, #0",
-            
-            //Indo de 0 até 9, ou seja 10 elementos
-            "GTE M, #9",
-            "CJP #40",
- 
-            //Soma B em A, calcula o proximo numero sequencia de fibonacci
-            "ADD A, B",
 
-            //Use a stack para mover o valor de A para C
-            "SUB SP, #2",
-            "STR A, SP",
-            "LDR C, SP",
-            "ADD SP, #2",
-
-            //Use a stack para mover o valor de B para A
-            "SUB SP, #2",
-            "STR B, SP",
-            "LDR A, SP",
-            "ADD SP, #2",
-
-            //Usa a staack para mover o valor de C para B
-            "SUB SP, #2",
-            "STR C, SP",
-            "LDR B, SP",
-            "ADD SP, #2",
-
-            //Reinicia o loop
-            "ADD M, #1",
-            "JMP #6",
-
-            "ADD FLAGS, #1"
-
-        };
-
-        let mut mem = LinearMemory::new(66000);
-        assert!(mem.write_program(&program));
-
-        let mut machine = Machine::new(mem);
-        machine.set_register(Register::SP, 0x100);
-        while let Ok(_) = machine.step() {
-            //machine.print_regs();
-            //println!("")
-        }
-
-        machine.print_regs();
-        //assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
-    }
-           #[test]
+    #[test]
     fn run_expo() {
         let program = rv16asm! {
             "MOV A, #2",
             "MOV B, #5",
 
-            "OR FLAGS, #4",   
-            "MUL A, B",     
-            "LDR SP, C",  
+            "EXPR C, A, B",
+            "LDR SP, C",
         };
 
         let mut mem = LinearMemory::new(66000);
