@@ -319,13 +319,8 @@ impl<M: Addressable> Machine<M> {
                     (None, Some(imm_value)) => {
                         self.registers[dst_reg as usize] = imm_value;
                     }
-                    _=> {
-                        unreachable!();
-                    }
-                    
+                    _=> unreachable!()
                 }
-                
-                
             }
             Instruction::MovShift(dst_reg, sh_am, left, imm) => {
                 let mut curr_value = self.registers[dst_reg as usize];

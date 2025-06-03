@@ -163,12 +163,13 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
         Instruction::Noop => 0,
         Instruction::Mov(reg, opt_reg, opt_imm ) => {
             let dst_reg = (*reg as u16) & 0b111;
-            
-            let (src, flag) = if opt_reg.is_some(){
-                    ((opt_reg.unwrap() as u16) & 0b111, 1)
-            } else{
-                ((opt_imm.unwrap() as u16) & 0b11111111, 0)
+
+            let (src, flag) = match (opt_reg, opt_imm) {
+                (Some(reg), None) => ((*reg as u16) & 0b111, 1),
+                (None, Some(imm)) => (*imm & 0b11111111, 0),
+                _ => unreachable!()
             };
+
             (src << 8) | (flag<<7) |(dst_reg << 4) | 0b0001
         }
         Instruction::MovShift(reg, sh_amt, left_shift, imm) => {
@@ -353,7 +354,6 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
 }
 
 pub fn encode_instructions(instructions: &[Instruction]) -> Vec<u16> {
-
     instructions.iter().map(encode_instruction).collect()
 }
 
@@ -580,7 +580,6 @@ fn parse_mov(args: &[&str]) -> Result<Instruction, AsmError> {
             reg, 
             None, 
             Some(imm),
-            
         ))
     } else {
         Ok(Instruction::Mov(
