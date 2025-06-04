@@ -115,7 +115,7 @@ pub enum Instruction {
     Arith(Register, Option<Register>, Option<u16>, ArithmeticOp),
 
     // Executes one of the arithmetic operations (add, sub, mul, div, mod, exp, sqrt)
-    // Format: 1011 | dst_reg(3) | op(3) | src_1reg(3) | src2_reg(3)
+    // Format: 1010 | dst_reg(3) | op(3) | src_1reg(3) | src2_reg(3)
     // op: 000 (add) 001 (sub) 010 (mul) 011 (div) 100 (mod) 101 (exp) 110 (sqrt)
     ArithRegReg(Register, Register, Register, ArithmeticOp),
 
@@ -202,10 +202,10 @@ impl TryFrom<u16> for Instruction {
             0b0011 => {
                 let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
                 let op = match (inst >> 7) & 0b11 {
-                    0b00 => ArithmeticOp::Add,
-                    0b01 => ArithmeticOp::Sub,
-                    0b10 => ArithmeticOp::Mul,
-                    0b11 => ArithmeticOp::Div,
+                        0b00 => ArithmeticOp::Add,
+                        0b01 => ArithmeticOp::Sub,
+                        0b10 => ArithmeticOp::Mul,
+                        0b11 => ArithmeticOp::Div,
                     _ => unreachable!(),
                 };
 
@@ -800,25 +800,13 @@ mod test {
     }
 
     #[test]
-    fn run_fibonacci_algorithm() {    // ...existing code...
-    0b1010 => {
-        let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
-        let op: ArithmeticOp = match (inst >> 7) & 0b111 {
-            0b000 => ArithmeticOp::Add,
-            0b001 => ArithmeticOp::Sub,
-            0b010 => ArithmeticOp::Mul,
-            0b011 => ArithmeticOp::Div,
-            0b100 => ArithmeticOp::Mod,
-            0b101 => ArithmeticOp::Exp,
-            0b110 => ArithmeticOp::Sqrt,
-            _ => unreachable!(),
-        };
-        let fst_reg = Register::try_from(((inst >> 10) & 0b111) as usize)?;
-        let snd_reg = Register::try_from(((inst >> 13) & 0b111) as usize)?;
-    
-        return Ok(Instruction::ArithRegReg(reg_dst, fst_reg, snd_reg, op));
-    }
-    // ...existing code...
+    fn run_fibonacci_algorithm() {
+        let program = rv16asm! {
+            "MOV A, #0",
+            "MOV B, #1",
+            "MOV M, #0",
+
+            "GTE M, #9",
             "CJP #40",
             "ADD A, B",
 

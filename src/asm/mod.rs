@@ -219,7 +219,7 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
             
             let fst_code: u16 = (*fst_reg as u16) & 0b111;
             let snd_code: u16 = (*snd_reg as u16) & 0b111;
-            (snd_code << 13) | (fst_code << 10) | (op << 7) | (reg_code << 4) | 0b1011 
+            (snd_code << 13) | (fst_code << 10) | (op << 7) | (reg_code << 4) | 0b1010
         }
         Instruction::LdrStr(r0, addr_reg, is_str, shift) => {
             let r0_code = (*r0 as u16) & 0b111;
@@ -662,6 +662,10 @@ mod test {
         let add_imm = Instruction::Arith(Register::C, None, Some(8), ArithmeticOp::Div);
         let inst = encode_instruction(&add_imm);
         assert_eq!(0b0010000110100011, inst);
+
+        let add_reg_reg = Instruction::ArithRegReg(Register::C, Register::A, Register::B, ArithmeticOp::Add);
+        let inst = encode_instruction(&add_reg_reg);
+        assert_eq!(0b001_000_000_010_1010, inst);
 
         let str = Instruction::LdrStr(Register::B, Register::SP, true, 0);
         let inst = encode_instruction(&str);
