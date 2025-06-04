@@ -203,7 +203,6 @@ impl TryFrom<u16> for Instruction {
                     0b10 => ArithmeticOp::Mul,
                     0b11 => ArithmeticOp::Div,
                     _ => unreachable!(),
-                    //0-00-000-0000
                 };
 
                 let uses_reg_as_input = (inst >> 9) & 0b1 == 1;
@@ -494,7 +493,7 @@ impl<M: Addressable> Machine<M> {
             ArithmeticOp::Mul => lhs * rhs,
             ArithmeticOp::Div => lhs / rhs,
             ArithmeticOp::Exp => lhs.pow(rhs as u32) as u16,
-            // TODO: A raiz quadrada só usa o valor do primeiro registrador
+            // INFO: sqrt uses only the first register's value
             ArithmeticOp::Sqrt => (lhs as f32).sqrt() as u16,
         };
         self.registers[dst_reg as usize] = result
@@ -915,14 +914,13 @@ mod test {
             "MOV B, #5",
 
             "EXPR C, A, B",
-            "LDR SP, C",
         };
 
         let mut mem = LinearMemory::new(66000);
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        machine.set_register(Register::SP, 0x100);
+        machine.set_register(Register::C, 0x100);
         while let Ok(_) = machine.step() {
             //machine.print_regs();
             //println!("")

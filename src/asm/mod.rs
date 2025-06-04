@@ -216,7 +216,7 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
                 ArithmeticOp::Exp => 0b101,
                 ArithmeticOp::Sqrt => 0b110,
             }; 
-            // Format: 1011 | dst_reg(3) | op(3) | fst_reg(3) | snd_reg(3)
+            
             let fst_code: u16 = (*fst_reg as u16) & 0b111;
             let snd_code: u16 = (*snd_reg as u16) & 0b111;
             (snd_code << 13) | (fst_code << 10) | (op << 7) | (reg_code << 4) | 0b1011 
@@ -395,9 +395,13 @@ pub fn parse_assembly_line<'a>(
         "SUB" => Box::new(parse_arithmetic(ArithmeticOp::Sub)),
         "MUL" => Box::new(parse_arithmetic(ArithmeticOp::Mul)),
         "DIV" => Box::new(parse_arithmetic(ArithmeticOp::Div)),
-        "MOD" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Mod)),
-        "EXP" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Exp)),
-        "SQR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Sqrt)),
+        "ADDR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Add)),
+        "SUBR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Sub)),
+        "MULR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Mul)),
+        "DIVR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Div)),
+        "MODR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Mod)),
+        "EXPR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Exp)),
+        "SQRTR" => Box::new(parse_arithmetic_reg_reg(ArithmeticOp::Sqrt)),
         "LDR" => Box::new(parse_ldr_str(false, false)),
         "STR" => Box::new(parse_ldr_str(false, true)),
         "LDB" => Box::new(parse_ldr_str(true, false)),
