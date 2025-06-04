@@ -129,7 +129,7 @@ To calculate the square root (√A).
 ex: 
   MOV A, #4
   ; this calcutare √4
-  EXPR C, A, #2
+  SQRTR C, A, #2
 
 #### CPY {from_register} {to_register}
 Copies a value from a memory address inside another memory address.
