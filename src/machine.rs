@@ -202,10 +202,10 @@ impl TryFrom<u16> for Instruction {
             0b0011 => {
                 let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
                 let op = match (inst >> 7) & 0b11 {
-                        0b00 => ArithmeticOp::Add,
-                        0b01 => ArithmeticOp::Sub,
-                        0b10 => ArithmeticOp::Mul,
-                        0b11 => ArithmeticOp::Div,
+                    0b00 => ArithmeticOp::Add,
+                    0b01 => ArithmeticOp::Sub,
+                    0b10 => ArithmeticOp::Mul,
+                    0b11 => ArithmeticOp::Div,
                     _ => unreachable!(),
                 };
 
