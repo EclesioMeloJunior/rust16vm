@@ -67,149 +67,261 @@ cargo build --release && ./target/release/asm output.bin ./testdata/loop.s
 
 #### MOV {destination_register}, #{immediate (9 bits)}
 Moves the `immediate` value to the `destination_register`
-Ex: MOV A, #10
+
+```
+MOV A, #10
+```
 
 #### MSL {destination_register}, [#{immediate (5 bits)}, #{shift_amount (3 bits)}]
 Shifts the value of `destination_register` to the left by `shift_amount` and then perform an `OR` operation using the `immediate`
-Ex: MSL B, [#1 #3]
+
+```
+MSL B, [#1 #3]
+```
 
 #### MSR {destination_register}, [#{immediate (5 bits)}, #{shift_amount (3 bits)}]
 Shifts the value of `destination_register` to the right by `shift_amount` and then perform an `OR` operation using the `immediate`
-Ex: MSR B, [#1 #3]
+ 
+```
+MSR B, [#1 #3]
+```
 
 #### ADD {destination_register}, {source_register}
 Performs a arithmetic addition between `destination_register` and `source_register`. Stores the result in the `destination_register`
-Ex: ADD A, B
+
+```
+ADD A, B
+```
 
 #### ADD {destination_register}, #{immediate (6 bits)}
 Performs a arithmetic addition between `destination_register` and `immediate`. Stores the result in the `destination_register`
-Ex: ADD A, #10
+
+```
+ADD A, #10
+```
 
 #### SUB {destination_register}, {source_register}
 Performs a arithmetic subtraction between `destination_register` and `source_register`. Stores the result in the `destination_register`
-Ex: SUB A, B
+
+```
+SUB A, B
+```
 
 #### SUB {destination_register}, #{immediate (6 bits)}
 Performs a arithmetic subtraction between `destination_register` and `immediate`. Stores the result in the `destination_register`
-Ex: SUB A, #10
+
+```
+ SUB A, #10
+```
 
 #### MUL {destination_register}, {source_register}
 Performs a arithmetic multiplication between `destination_register` and `source_register`. Stores the result in the `destination_register`
-Ex: MUL A, B
+
+```
+MUL A, B
+```
 
 #### MUL {destination_register}, #{immediate (6 bits)}
 Performs a arithmetic multiplication between `destination_register` and `immediate`. Stores the result in the `destination_register`
-Ex: MUL A, #10
+
+```
+MUL A, #10
+```
 
 #### DIV {destination_register}, {source_register}
 Performs a arithmetic division between `destination_register` and `source_register`. Stores the result in the `destination_register`
-Ex: DIV A, B
+
+```
+DIV A, B
+```
 
 #### DIV {destination_register}, #{immediate (6 bits)}
 Performs a arithmetic division between `destination_register` and `immediate`. Stores the result in the `destination_register`
-Ex: DIV A, #10
+
+```
+DIV A, #10
+```
 
 #### MOD (unstable)
 To calculate the modulo (remainder of a division) of two numbers you should set the bit at index 1 of the FLAGS register to `1` and then perform the division instruction, the modulo will be placed in the stack
-Ex: 
-  OR FLAGS, #2 //sets the bit at position 1 to be `1`
-  DIV A, B     // performs the division
-  LDR SP, C    // gets from the stack the module and store in C
+
+```
+OR FLAGS, #2 //sets the bit at position 1 to be `1`
+DIV A, B     // performs the division
+LDR SP, C    // gets from the stack the module and store in C
+```
+
+#### EXPR {dst_register}, {base_reg}, {exponent_reg}
+To calculate the exponentiation (Aⁿ).
+
+```
+MOV A, #2
+MOV B, #3
+; this will calculate 2 ^ 3
+EXPR C, A, B
+```
+#### SQRT {dst_register}, {base_reg}, {exponent_reg}
+To calculate the square root (√A).
+
+```
+MOV A, #4
+; this calcutare √4
+SQRTR C, A, #2
+```
 
 #### CPY {from_register} {to_register}
 Copies a value from a memory address inside another memory address.
-Ex: CPY A, B // where A and B holds memory addresses
+
+```
+CPY A, B // where A and B holds memory addresses
+```
 
 #### LDR {from_register} {destination_register}
 Loads a 2 bytes value from memory into `destination_register`
-Ex: LDR SP, A // loads a value in the stack into the register A
+
+```
+LDR SP, A // loads a value in the stack into the register A
+```
 
 #### STR {src_register} {addr_register}
 Stores a 2 bytes value stored in `src_register` in the memory using the address from `addr_register`
-Ex: 
+
+```
   MOV A, #72
   MOV B, #0x0F
   STR A, B // stores the value 72 in the memory address 0x0F
+```
 
 #### LDB {from_register} {destination_register}
 Loads a 1 byte value from memory into `destination_register`
-Ex: LDB SP, A // loads a value in the stack into the register A
+
+```
+LDB SP, A // loads a value in the stack into the register A
+```
 
 #### STB {src_register} {addr_register}
 Stores a 1 bytes value stored in `src_register` in the memory using the address from `addr_register`
-Ex: 
+
+
+``` 
   MOV A, #72
   MOV B, #0x0F
   STB A, B // stores the value 72 in the memory address 0x0F
+```
 
 #### JMP {register}
 Unconditional jump, changes the program counter register to be the value inside the given `register`
-Ex:
+
+```
   MOV A, #0
   JMP A // change the VM program counter to read instruction at 0 address
+```
 
 #### JMP {immediate (11 bits)}
 Unconditional jump, changes the program counter register to be the value inside the given `register`
-Ex:
-  JMP #0 // change the VM program counter to read instruction at 0 address
+
+```
+JMP #0 // change the VM program counter to read instruction at 0 address
+```
 
 #### CJP {register}
 Conditional jump, changes the program counter register to be the value inside the given `register` based on the FLAGS register bit at position 3, if 1 then it jumps otherwise proceed to the next instruction.
-Ex:
-  MOV B, #0
-  EQ A, #10
-  CJP B // if register A holds value 10 then it jumps to the location 0 (placed in register B)
+
+```
+MOV B, #0
+EQ A, #10
+CJP B // if register A holds value 10 then it jumps to the location 0 (placed in register B)
+```
 
 #### CJP {immediate (11 bits)}
 Conditional jump, changes the program counter register to be the value inside the given `register` based on the FLAGS register bit at position 3, if 1 then it jumps otherwise proceed to the next instruction.
-Ex:
-  EQ A, #10
-  CJP #0 // if register A holds value 10 then it jumps to the location 0
+
+```
+EQ A, #10
+CJP #0 // if register A holds value 10 then it jumps to the location 0
+```
 
 #### EQ {source_register}, {cmp_register}
 Perfoms an equal comparision (==) between two registers, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: EQ A, B
+
+```
+EQ A, B
+```
 
 #### EQ {source_register}, {immediate (5 bits)}
 Perfoms an equal comparision (==) between register and immediate, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: EQ A, #100
+
+```
+EQ A, #100
+```
+
 
 #### NEQ {source_register}, {cmp_register}
 Perfoms a not equal comparision (!=) between two registers, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: NEQ A, B
+
+```
+NEQ A, B
+```
 
 #### NEQ {source_register}, {immediate (5 bits)}
 Perfoms a not equal comparision (!=) between register and immediate, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: NEQ A, #100
+
+```
+NEQ A, #100
+```
 
 #### LT {source_register}, {cmp_register}
 Perfoms a less than comparision (<) between two registers, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: LT A, B
+
+```
+LT A, B
+```
 
 #### LT {source_register}, {immediate (5 bits)}
 Perfoms a less than comparision (<) between register and immediate, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: LT A, #100
+
+```
+LT A, #100
+```
 
 #### LTE {source_register}, {cmp_register}
 Perfoms a less than or equal comparision (<=) between two registers, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: LTE A, B
+
+```
+LTE A, B
+```
 
 #### LT {source_register}, {immediate (5 bits)}
 Perfoms a less than or equal comparision (<=) between register and immediate, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: LTE A, #100
+
+```
+LTE A, #100
+```
 
 #### GT {source_register}, {cmp_register}
 Perfoms a greater than comparision (>) between two registers, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: GT A, B
+
+```
+GT A, B
+```
 
 #### GT {source_register}, {immediate (5 bits)}
 Perfoms a greater than comparision (>) between register and immediate, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: GT A, #100
+
+```
+GT A, #100
+```
 
 #### GTE {source_register}, {cmp_register}
 Perfoms a greater than or equal comparision (>=) between two registers, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: GTE A, B
+
+```
+GTE A, B
+```
 
 #### GTE {source_register}, {immediate (5 bits)}
 Perfoms a greater than or equal comparision (>=) between register and immediate, setting the FLAGS register bit at position 3 to `1` if true, `0` otherwise
-Ex: GTE A, #100
+
+```
+GTE A, #100
+```
