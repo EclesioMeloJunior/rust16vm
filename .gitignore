@@ -2,3 +2,4 @@
 .goals
 
 *.bin
+.DS_store
