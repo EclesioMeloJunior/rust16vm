@@ -41,9 +41,15 @@ impl ToString for Instruction {
     fn to_string(&self) -> String {
         match self {
             Instruction::Noop => "NOOP".to_string(),
-            Instruction::Mov(reg, val) => {
-                format!("MOV {}, #{}", reg.to_string(), val.to_string())
+
+            Instruction::Mov(reg, Some(src_reg), None) => {
+                format!("MOV {}, {}", reg.to_string(), src_reg.to_string())
             }
+            Instruction::Mov(reg, None, Some(imm)) => {
+                format!("MOV {}, #{}", reg.to_string(), imm)
+            }
+            
+            
             Instruction::MovShift(reg, shift_amt, is_left, imm) => {
                 if *is_left {
                     format!("MSL {}, [#{} #{}]", reg.to_string(), shift_amt, imm)
@@ -145,6 +151,9 @@ impl ToString for Instruction {
 
                 format!("CALL #{}", addr.to_string())
             }
+            _=>{
+                unreachable!()
+            }
         }
     }
 }
@@ -152,10 +161,16 @@ impl ToString for Instruction {
 pub fn encode_instruction(inst: &Instruction) -> u16 {
     match inst {
         Instruction::Noop => 0,
-        Instruction::Mov(reg, imm) => {
-            let reg_code = (*reg as u16) & 0b111;
-            let imm = imm & 0b111111111;
-            (imm << 7) | (reg_code << 4) | 0b0001
+        Instruction::Mov(reg, opt_reg, opt_imm ) => {
+            let dst_reg = (*reg as u16) & 0b111;
+
+            let (src, flag) = match (opt_reg, opt_imm) {
+                (Some(reg), None) => ((*reg as u16) & 0b111, 1),
+                (None, Some(imm)) => (*imm & 0b11111111, 0),
+                _ => unreachable!()
+            };
+
+            (src << 8) | (flag<<7) |(dst_reg << 4) | 0b0001
         }
         Instruction::MovShift(reg, sh_amt, left_shift, imm) => {
             let reg_code = (*reg as u16) & 0b111;
@@ -339,7 +354,6 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
 }
 
 pub fn encode_instructions(instructions: &[Instruction]) -> Vec<u16> {
-
     instructions.iter().map(encode_instruction).collect()
 }
 
@@ -436,7 +450,9 @@ fn parse_jmp<'a>(
     }
 }
 
-fn parse_call<'a>(labels: &'a HashMap<String, u16>) -> impl Fn(&[&str]) -> Result<Instruction, AsmError>  {
+fn parse_call<'a>(
+    labels: &'a HashMap<String, u16>,
+) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
     move |args: &[&str]| -> Result<Instruction, AsmError> {
         if args.len() != 1 {
             return Err(AsmError::InvalidInstruction);
@@ -453,7 +469,7 @@ fn parse_call<'a>(labels: &'a HashMap<String, u16>) -> impl Fn(&[&str]) -> Resul
         };
 
         return Ok(Instruction::CallRet(false, addr));
-    }   
+    }
 }
 
 
@@ -557,9 +573,22 @@ fn parse_mov(args: &[&str]) -> Result<Instruction, AsmError> {
     }
 
     let reg = args[0].trim_end_matches(',').parse::<Register>()?;
-    let imm = parse_immediate(args[1])?;
+    
+    if args[1].starts_with('#') {
+        let imm = parse_immediate(args[1])?;
+        Ok(Instruction::Mov(
+            reg, 
+            None, 
+            Some(imm),
+        ))
+    } else {
+        Ok(Instruction::Mov(
+            reg, 
+            Some(args[1].parse::<Register>()?),
+            None,
+        ))
+    }
 
-    Ok(Instruction::Mov(reg, imm))
 }
 
 fn parse_mov_shift(dir: bool) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
@@ -592,9 +621,13 @@ mod test {
 
     #[test]
     fn test_encode_instruction() {
-        let mov = Instruction::Mov(Register::C, 10);
+        let mov = Instruction::Mov(Register::C, None, Some(10));
         let inst = encode_instruction(&mov);
-        assert_eq!(0b0000010100100001, inst);
+        assert_eq!(0b0000101000100001, inst);
+
+        let mov = Instruction::Mov(Register::A, Some(Register::B), None);
+        let inst = encode_instruction(&mov);
+        assert_eq!(0b0000000110000001, inst);
 
         let msl = Instruction::MovShift(Register::B, 4, true, 4);
         let inst = encode_instruction(&msl);
@@ -635,7 +668,12 @@ mod test {
 
         let input = "MOV A, #10";
         let inst = parse_assembly_line(input, &empty).unwrap();
-        assert_eq!(inst, Instruction::Mov(Register::A, 10));
+        assert_eq!(inst, Instruction::Mov(Register::A, None, Some(10)));
+
+        let input = "MOV B, A";
+        let inst = parse_assembly_line(input, &empty).unwrap();
+        assert_eq!(inst, Instruction::Mov(Register::B, Some(Register::A), None));
+
 
         let input = "MSL A, [#11 #4]";
         let inst = parse_assembly_line(input, &empty).unwrap();

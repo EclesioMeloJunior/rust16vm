@@ -98,8 +98,8 @@ impl TryFrom<usize> for CompareOp {
 pub enum Instruction {
     Noop,
 
-    // Format: 0001 | reg(3) | immediate(9)
-    Mov(Register, u16),
+    // Format: 0001 | reg(3) |flag(1) |[flag == 1]reg(3),[flag == 0]imm(8)
+    Mov(Register, Option<Register>, Option<u16>),
 
     // Move with shift
     // Format: 0010 | reg(3) | shift_amt(3) | direction(1) | immediate(5)
@@ -152,8 +152,23 @@ impl TryFrom<u16> for Instruction {
             0b0000 => Ok(Instruction::Noop),
             0b0001 => {
                 let reg_dst = ((inst >> 4) & 0b111) as usize;
-                let imm = (inst >> 7) & 0b111111111;
-                return Ok(Instruction::Mov(Register::try_from(reg_dst)?, imm));
+                let is_reg = (inst >> 7) & 0b1 == 1;
+                if  is_reg{
+                    return Ok(
+                        Instruction::Mov(
+                            Register::try_from(reg_dst)?,
+                            Some(Register::try_from(((inst >> 8) & 0b111) as usize)?),
+                            None,
+                        ));
+                } else{
+                    return Ok(
+                        Instruction::Mov(
+                            Register::try_from(reg_dst)?,
+                            None,
+                            Some((inst >> 8) & 0b111111111),
+                        ));
+                }
+        
             }
             0b0010 => {
                 let reg_dst = ((inst >> 4) & 0b111) as usize;
@@ -291,12 +306,21 @@ impl<M: Addressable> Machine<M> {
 
         let inst = Instruction::try_from(raw)?;
         
-        self.print_regs();
-        println!("{:?} @ {}", inst, pc);
+        // self.print_regs();
+        // println!("{:?} @ {}", inst, pc);
 
         match inst {
-            Instruction::Mov(dst_reg, imm) => {
-                self.registers[dst_reg as usize] = imm;
+            Instruction::Mov(dst_reg, reg, imm) => {
+                match (reg, imm) {
+                    (Some(src_reg), None) => {
+                        let src_value = self.registers[src_reg as usize];
+                        self.registers[dst_reg as usize] = src_value;
+                    }
+                    (None, Some(imm_value)) => {
+                        self.registers[dst_reg as usize] = imm_value;
+                    }
+                    _=> unreachable!()
+                }
             }
             Instruction::MovShift(dst_reg, sh_am, left, imm) => {
                 let mut curr_value = self.registers[dst_reg as usize];
@@ -513,14 +537,16 @@ mod test {
     fn valid_mov_instruction() {
         let mut mem = LinearMemory::new(8 * 1024); //8Kb
         // 3 instructions to fill a register with ones
-        mem.write2(0, 0b1111111110000001); // MOV A, #8
-        mem.write2(2, 0b1111111010000010); // MSL A, 5 #31
-        mem.write2(4, 0b0001110100000010); // MSL A, 2 #3
+        mem.write2(0, 0b11111111_0_000_0001); // MOV A, #255
+        mem.write2(2, 0b11111_1_101_000_0010); // MSL A, 5 #31
+        mem.write2(4, 0b00111_1_011_000_0010); // MSL A, 2 #7
 
         let mut machine = Machine::new(mem);
         for _i in 0..3 {
             machine.step().unwrap();
         }
+
+        machine.print_regs();
 
         assert_eq!(machine.registers[Register::A as usize], u16::MAX);
     }
@@ -529,7 +555,7 @@ mod test {
     fn arithmetic_instruction() {
         let default_mem = || {
             let mut mem = LinearMemory::new(8 * 1024); //8Kb
-            mem.write2(0, 0b0000010000000001); // MOV A, #8
+            mem.write2(0, 0b00001000_0_000_0001); // MOV A, #8
             mem
         };
 
@@ -562,7 +588,7 @@ mod test {
         // MOV B, #2
         // ADD A, B
         run(
-            vec![0b000000010_001_0001, 0b000_001_1_00_000_0011],
+            vec![0b00000010_0_001_0001, 0b000_001_1_00_000_0011],
             vec![(Register::A, 10)],
         );
 
@@ -572,7 +598,7 @@ mod test {
         // MOV B, #2
         // SUB A, B
         run(
-            vec![0b000000010_001_0001, 0b000_001_1_01_000_0011],
+            vec![0b00000010_0_001_0001, 0b000_001_1_01_000_0011],
             vec![(Register::A, 6)],
         );
 
@@ -582,7 +608,7 @@ mod test {
         // MOV B, #2
         // MUL A, B
         run(
-            vec![0b000000010_001_0001, 0b000_001_1_10_000_0011],
+            vec![0b00000010_0_001_0001, 0b000_001_1_10_000_0011],
             vec![(Register::A, 16)],
         );
 
@@ -594,7 +620,7 @@ mod test {
         // DIV A, #5 - with FLAGS
         let machine = run(
             vec![
-                0b000000010_111_0001, 
+                0b00000010_0_111_0001, 
                 0b000010_0_01_100_0011,
                 0b000101_0_11_000_0011,
             ],
@@ -609,19 +635,19 @@ mod test {
         // MOV B, #2
         // DIV A, B - no FLAGS
         run(
-            vec![0b000000010_001_0001, 0b000_001_1_11_000_0011],
+            vec![0b00000010_0_001_0001, 0b000_001_1_11_000_0011],
             vec![(Register::A, 4)],
         );
 
         // MOV FL, #2
         // SUB SP, #2
-        // MOV B, #2
+        // MOV B, #5
         // DIV A, B - with FLAGS
         let machine = run(
             vec![
-                0b000000010_111_0001,
+                0b00000010_0_111_0001,
                 0b000010_0_01_100_0011,
-                0b000000101_001_0001,
+                0b00000101_0_001_0001,
                 0b000_001_1_11_000_0011,
             ],
             vec![(Register::A, 1)],
@@ -637,7 +663,7 @@ mod test {
     fn test_jump_instruction() {
         let mut mem = LinearMemory::new(1024);
         mem.write2(0, 0b00000001010_0_0110); // JMP #10
-        mem.write2(10, 0b0000010000000001); // MOV A, #8
+        mem.write2(10, 0b00001000_0_000_0001); // MOV A, #8
 
         let mut machine = Machine::new(mem);
         machine.print_regs();
@@ -867,5 +893,30 @@ mod test {
         assert_eq!(machine.registers[Register::C as usize], 0);
         assert_eq!(machine.registers[Register::SP as usize], 100);
         assert_eq!(machine.registers[Register::FLAGS as usize], 0b11);
+    }
+
+
+
+    #[test]
+    fn test_mov_register(){
+        let program = rv16asm! {
+            "MOV A, #10",
+            "MOV B, A",
+            
+            "ADD FLAGS, #1",
+
+
+        };
+        let mut mem = LinearMemory::new(1024);
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+        machine.set_register(Register::SP, 100);
+
+        while let Ok(State::Continue) = machine.step() {
+        }
+        assert_eq!(machine.registers[Register::B as usize], 10);
+
+        machine.print_regs();
     }
 }
