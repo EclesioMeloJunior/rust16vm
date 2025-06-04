@@ -343,6 +343,9 @@ impl<M: Addressable> Machine<M> {
                 (None, Some(imm)) => self.arithmetic_op(dst_reg, imm, arith_op),
                 _ => unreachable!(),
             },
+            Instruction::ArithRegReg(dst_reg, fst_reg, snd_reg, op ) => { 
+                self.arithmetic_op_reg_reg(dst_reg, fst_reg, snd_reg, op);
+            },
             Instruction::LdrStr(r0, addr_reg, is_str, shift) => {
                 let base = self.registers[addr_reg as usize];
                 let at = base + (shift as u16);
@@ -350,9 +353,7 @@ impl<M: Addressable> Machine<M> {
                 if is_str {
                     let to_store = self.registers[r0 as usize];
                     if !self.memory.write2(at, to_store) {
-                        // failed to perform memory write
-                        // force a halt
-                        // 0b0...101
+
                         self.set_flags((0b1 << 2) | 0b1);
                     }
                 } else {
@@ -369,9 +370,7 @@ impl<M: Addressable> Machine<M> {
                 if is_str {
                     let to_store: u8 = self.registers[r0 as usize] as u8;
                     if !self.memory.write(at, to_store) {
-                        // failed to perform memory write
-                        // force a halt
-                        // 0b0...101
+
                         self.set_flags((0b1 << 2) | 0b1);
                     }
                 } else {
@@ -396,7 +395,6 @@ impl<M: Addressable> Machine<M> {
                 let curr_flags = self.registers[Register::FLAGS as usize];
                 let should_jmp = (curr_flags >> 3) & 0b1 == 1;
                 if should_jmp {
-                    // switch back the bit to 0 after reading it
                     self.registers[Register::FLAGS as usize] ^= 1 << 3;
 
                     match (opt_reg, opt_imm) {
@@ -493,7 +491,6 @@ impl<M: Addressable> Machine<M> {
             ArithmeticOp::Mul => lhs * rhs,
             ArithmeticOp::Div => lhs / rhs,
             ArithmeticOp::Exp => lhs.pow(rhs as u32) as u16,
-            // INFO: sqrt uses only the first register's value
             ArithmeticOp::Sqrt => (lhs as f32).sqrt() as u16,
         };
         self.registers[dst_reg as usize] = result
@@ -554,11 +551,10 @@ mod test {
 
     #[test]
     fn valid_mov_instruction() {
-        let mut mem = LinearMemory::new(8 * 1024); //8Kb
-        // 3 instructions to fill a register with ones
-        mem.write2(0, 0b1111111110000001); // MOV A, #8
-        mem.write2(2, 0b1111111010000010); // MSL A, 5 #31
-        mem.write2(4, 0b0001110100000010); // MSL A, 2 #3
+        let mut mem = LinearMemory::new(8 * 1024); 
+        mem.write2(0, 0b1111111110000001); 
+        mem.write2(2, 0b1111111010000010); 
+        mem.write2(4, 0b0001110100000010); 
 
         let mut machine = Machine::new(mem);
         for _i in 0..3 {
@@ -571,12 +567,11 @@ mod test {
     #[test]
     fn arithmetic_instruction() {
         let default_mem = || {
-            let mut mem = LinearMemory::new(8 * 1024); //8Kb
-            mem.write2(0, 0b0000010000000001); // MOV A, #8
+            let mut mem = LinearMemory::new(8 * 1024); 
+            mem.write2(0, 0b0000010000000001); 
             mem
         };
 
-        // run adds number 8 to register A
         let run =
             move |instrs: Vec<u16>, assertions: Vec<(Register, u16)>| -> Machine<LinearMemory> {
                 let mut mem = default_mem();
@@ -599,42 +594,29 @@ mod test {
                 machine
             };
 
-        // ADD A, #2
         run(vec![0b0000100000000011], vec![(Register::A, 10)]);
 
-        // MOV B, #2
-        // ADD A, B
         run(
             vec![0b000000010_001_0001, 0b000_001_1_00_000_0011],
             vec![(Register::A, 10)],
         );
 
-        // SUB A, #2
         run(vec![0b000010_0_01_000_0011], vec![(Register::A, 6)]);
 
-        // MOV B, #2
-        // SUB A, B
         run(
             vec![0b000000010_001_0001, 0b000_001_1_01_000_0011],
             vec![(Register::A, 6)],
         );
 
-        // MUL A, #2
         run(vec![0b000010_0_10_000_0011], vec![(Register::A, 16)]);
 
-        // MOV B, #2
-        // MUL A, B
         run(
             vec![0b000000010_001_0001, 0b000_001_1_10_000_0011],
             vec![(Register::A, 16)],
         );
 
-        // DIV A, #2 - no FLAGS
         run(vec![0b000010_0_11_000_0011], vec![(Register::A, 4)]);
 
-        // MOV FL, #2
-        // SUB SP, #2
-        // DIV A, #5 - with FLAGS
         let machine = run(
             vec![
                 0b000000010_111_0001,
@@ -649,17 +631,11 @@ mod test {
 
         assert_eq!(stored.unwrap(), 3_u16);
 
-        // MOV B, #2
-        // DIV A, B - no FLAGS
         run(
             vec![0b000000010_001_0001, 0b000_001_1_11_000_0011],
             vec![(Register::A, 4)],
         );
 
-        // MOV FL, #2
-        // SUB SP, #2
-        // MOV B, #2
-        // DIV A, B - with FLAGS
         let machine = run(
             vec![
                 0b000000010_111_0001,
@@ -679,8 +655,8 @@ mod test {
     #[test]
     fn test_jump_instruction() {
         let mut mem = LinearMemory::new(1024);
-        mem.write2(0, 0b00000001010_0_0110); // JMP #10
-        mem.write2(10, 0b0000010000000001); // MOV A, #8
+        mem.write2(0, 0b00000001010_0_0110); 
+        mem.write2(10, 0b0000010000000001); 
 
         let mut machine = Machine::new(mem);
         machine.print_regs();
@@ -700,13 +676,13 @@ mod test {
         let program = rv16asm! {
             "MOV A, #0",
 
-            // loop
+            
             "EQ A, #10",
             "CJP #10",
             "ADD A, #1",
             "JMP #2",
 
-            "ADD FLAGS, #1" // halts machine
+            "ADD FLAGS, #1"
         };
 
         let mut mem = LinearMemory::new(1024);
@@ -723,12 +699,12 @@ mod test {
     fn should_halt_trying_to_write_at_read_only_addr() {
         let program = rv16asm! {
             "MOV A, #39",
-            "MOV B, #100", // B stores the addr
+            "MOV B, #100", 
             "STR A, B"
         };
 
         let mut mem = LinearMemory::new(1024);
-        mem.as_read_only(100, 2); // defines addr 100 as readonly
+        mem.as_read_only(100, 2); 
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
@@ -736,7 +712,7 @@ mod test {
             machine.print_regs();
         }
 
-        assert_eq!(machine.registers[Register::FLAGS as usize], 5) // the FLAGS should be 0...101
+        assert_eq!(machine.registers[Register::FLAGS as usize], 5) 
     }
 
     #[test]
@@ -752,13 +728,13 @@ mod test {
 
         let mut machine = Machine::new(mem);
 
-        machine.step().unwrap(); // MOV A, #1
+        machine.step().unwrap(); 
 
-        machine.step().unwrap(); // EQ A, #1
-        assert_eq!(machine.registers[Register::FLAGS as usize], 0b1000); // the FLAGS should be 0...101
+        machine.step().unwrap(); 
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b1000); 
 
-        machine.step().unwrap(); // EQ A, #2
-        assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
+        machine.step().unwrap(); 
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) 
     }
 
     #[test]
@@ -787,16 +763,6 @@ mod test {
 
     #[test]
     fn call_to_another_label() {
-        /*
-        func sum(a, b int) int {
-            return a + b
-        }
-
-        func main() {
-            sum(1, 2);
-            c := 55;
-        }
-        */
         let program = rv16asm! {
             "ADD A, B",
             "RET",
@@ -874,7 +840,7 @@ mod test {
         assert_eq!(machine.registers[Register::A as usize], 34);
         assert_eq!(machine.registers[Register::B as usize], 55);
         assert_eq!(machine.registers[Register::M as usize], 9);
-        assert_eq!(machine.registers[Register::FLAGS as usize], 1) // the FLAGS should be 0...101
+        assert_eq!(machine.registers[Register::FLAGS as usize], 1) 
     }
 
     #[test]
@@ -920,13 +886,12 @@ mod test {
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        machine.set_register(Register::C, 0x100);
         while let Ok(_) = machine.step() {
-            //machine.print_regs();
-            //println!("")
         }
-
+    
         machine.print_regs();
-        //assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) // the FLAGS should be 0...101
+
+        assert_eq!(machine.registers[Register::C as usize], 32);
+
     }
 }

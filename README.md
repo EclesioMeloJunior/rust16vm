@@ -118,12 +118,13 @@ Ex:
 
 #### EXPR {dst_register}, {base_reg}, {exponent_reg}
 To calculate the exponentiation (Aⁿ).
-Ex:
-  MOV A, #2
-  MOV B, #3
-  ; this will calculate 2 ^ 3
-  EXPR C, A, B
 
+```
+MOV A, #2
+MOV B, #3
+; this will calculate 2 ^ 3
+EXPR C, A, B
+```
 #### SQRT {dst_register}, {base_reg}, {exponent_reg}
 To calculate the square root (√A).
 ex: 
