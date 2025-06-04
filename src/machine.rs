@@ -174,9 +174,13 @@ impl TryFrom<u16> for Instruction {
                     imm,
                 ));
             }
-            0b1011 => {
+            0b1010 => {
                 let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
                 let op: ArithmeticOp = match (inst >> 7) & 0b111 {
+                    0b000 => ArithmeticOp::Add,
+                    0b001 => ArithmeticOp::Sub,
+                    0b010 => ArithmeticOp::Mul,
+                    0b011 => ArithmeticOp::Div,
                     0b100 => ArithmeticOp::Mod,
                     0b101 => ArithmeticOp::Exp,
                     0b110 => ArithmeticOp::Sqrt,
@@ -796,13 +800,25 @@ mod test {
     }
 
     #[test]
-    fn run_fibonacci_algorithm() {
-        let program = rv16asm! {
-            "MOV A, #0",
-            "MOV B, #1",
-            "MOV M, #0",
-
-            "GTE M, #9",
+    fn run_fibonacci_algorithm() {    // ...existing code...
+    0b1010 => {
+        let reg_dst = Register::try_from(((inst >> 4) & 0b111) as usize)?;
+        let op: ArithmeticOp = match (inst >> 7) & 0b111 {
+            0b000 => ArithmeticOp::Add,
+            0b001 => ArithmeticOp::Sub,
+            0b010 => ArithmeticOp::Mul,
+            0b011 => ArithmeticOp::Div,
+            0b100 => ArithmeticOp::Mod,
+            0b101 => ArithmeticOp::Exp,
+            0b110 => ArithmeticOp::Sqrt,
+            _ => unreachable!(),
+        };
+        let fst_reg = Register::try_from(((inst >> 10) & 0b111) as usize)?;
+        let snd_reg = Register::try_from(((inst >> 13) & 0b111) as usize)?;
+    
+        return Ok(Instruction::ArithRegReg(reg_dst, fst_reg, snd_reg, op));
+    }
+    // ...existing code...
             "CJP #40",
             "ADD A, B",
 
