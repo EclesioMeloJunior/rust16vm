@@ -385,7 +385,6 @@ impl<M: Addressable> Machine<M> {
                         self.set_flags((0b1 << 2) | 0b1);
                     }
                 } else {
-                    println!("ONDE ESTOU LENDO: {}", at);
                     if let Some(value) = self.memory.read2(at) {
                         self.registers[r0 as usize] = value;
                     }

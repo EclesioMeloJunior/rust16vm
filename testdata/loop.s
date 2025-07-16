@@ -72,6 +72,14 @@ MOV A, #3
 STB A, B
 RET
 
+// 100 
+// 0
+// 0
+// 1
+
+// 0 0 1
+// 1 0 0
+
 int_to_str_bef_loop:
 MOV C, #0
 
