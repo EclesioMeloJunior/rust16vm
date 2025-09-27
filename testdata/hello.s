@@ -22,3 +22,5 @@ MOV A, #2
 MOV B, #482
 MSL B, [#2 #7]
 STR A, B
+
+ADD FLAGS, #1

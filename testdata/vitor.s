@@ -42,3 +42,5 @@ MSL B, [#1 #4]
 MSL B, [#1 #7]
 MSL B, [#0 #1]
 STR A, B
+
+ADD FLAGS, #1
