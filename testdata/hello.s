@@ -12,7 +12,7 @@ ADD B, #1
 STR A, B 
 MOV A, #108
 ADD B, #1
-STR A, C
+STR A, B
 
 MOV A, #111
 ADD B, #1
