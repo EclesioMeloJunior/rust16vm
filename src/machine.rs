@@ -330,8 +330,10 @@ impl<M: Addressable> Machine<M> {
 
         let inst = Instruction::try_from(raw)?;
 
-        self.print_regs();
-        print!("{:?} @ {}\r\n", inst, pc);
+        if self.is_debug {
+            self.print_regs();
+            print!("{:?} @ {}\r\n", inst, pc);
+        }
 
         match inst {
             Instruction::Mov(dst_reg, reg, imm) => {
