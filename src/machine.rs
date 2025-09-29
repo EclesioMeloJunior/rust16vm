@@ -175,7 +175,7 @@ impl TryFrom<u16> for Instruction {
                             Some((inst >> 8) & 0b111111111),
                         ));
                 }
-        
+
             }
             0b0010 => {
                 let reg_dst = ((inst >> 4) & 0b111) as usize;
@@ -330,8 +330,8 @@ impl<M: Addressable> Machine<M> {
 
         let inst = Instruction::try_from(raw)?;
 
-        // self.print_regs();
-        // println!("{:?} @ {}", inst, pc);
+        self.print_regs();
+        print!("{:?} @ {}\r\n", inst, pc);
 
         match inst {
             Instruction::Mov(dst_reg, reg, imm) => {
@@ -461,7 +461,9 @@ impl<M: Addressable> Machine<M> {
 
                 return Ok(State::Continue);
             }
-            _ => return Err(format!("invalid instruction: {:?}", inst)),
+            _ => {
+                return Err(format!("invalid instruction: {:?}", inst))
+            },
         }
 
         self.registers[Register::PC as usize] += 2;
@@ -542,8 +544,8 @@ impl<M: Addressable> Machine<M> {
 
     pub fn print_regs(&self) -> () {
         for (idx, value) in self.registers.iter().enumerate() {
-            println!(
-                "{}:\t{:#018b} | {:#04x} | {}",
+            print!(
+                "{}:\t{:#018b} | {:#04x} | {}\r\n",
                 Register::try_from(idx).unwrap().to_string(),
                 value,
                 value,

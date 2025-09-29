@@ -1,12 +1,9 @@
 use std::{
-    io::{Write, stdout},
+    io::{Write, stdout, stdin},
     usize,
 };
-
 use crossterm::{
-    ExecutableCommand, QueueableCommand, cursor, execute,
-    style::{self, Print, Stylize},
-    terminal::{self, Clear, ClearType},
+    cursor, event::{read, Event, KeyCode}, execute, style::{self, Print, Stylize}, terminal::{self, Clear, ClearType}, ExecutableCommand, QueueableCommand
 };
 
 use super::Device;
@@ -28,6 +25,11 @@ const TERM_CMD_SET_CURSOR: u8 = 0b100;
 const TERM_FLAG_READY: u8 = 0b1;
 const TERM_FLAG_ERROR: u8 = 0b10;
 
+pub enum TerminalAction {
+    KeyPressed(char),
+    KeyPressedEnter
+}
+
 pub struct Terminal256 {
     buffer: [u8; TERM_BUFFER_SIZE],
     cursor: (u8, u8),
@@ -46,6 +48,24 @@ impl Terminal256 {
             buffer: [0; TERM_BUFFER_SIZE],
             cursor: (0, 0),
             flags: TERM_FLAG_READY,
+        }
+    }
+
+    pub fn read_from_stdin() -> std::io::Result<TerminalAction> {
+        loop {
+            // Blocks until an `Event` is available
+            match read()? {
+                Event::Key(event) => {
+                    if event.code == KeyCode::Char('q') {
+                        return Ok(TerminalAction::KeyPressed('q'));
+                    }
+
+                    if event.code == KeyCode::Enter {
+                        return Ok(TerminalAction::KeyPressedEnter);
+                    }
+                },
+                _ => {} // Handle other event types if necessary
+            }
         }
     }
 }

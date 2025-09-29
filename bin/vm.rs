@@ -1,9 +1,11 @@
 use std::env::{self};
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, prelude::*};
 use std::path::Path;
 
+use crossterm::terminal as crossterm_terminal;
 use rust16vm::devices::screen::ScreenOptions;
+use rust16vm::devices::terminal::TerminalAction;
 use rust16vm::machine::State;
 use rust16vm::{
     devices::{keyboard::Keyboard, screen::ScreenDevice, terminal::Terminal256},
@@ -12,95 +14,19 @@ use rust16vm::{
     mmio::MemoryWithDevices,
     rv16asm,
 };
-/*
-let program = rv16asm! {
-        "MOV A, #72",           // 'h'
-        "MOV B, #0x0F",
-        "MSL B, [#0 #7]",
-        "MSL B, [#0 #5]",      // terminal buffer start
-        "STR A, B",
-
-        "MOV A, #101",           // 'e'
-        "ADD B, #1",
-        "STR A, B",
-
-        "MOV A, #108",           // 'l'
-        "ADD B, #1",
-        "STR A, B",
-
-        "MOV A, #108",           // 'l'
-        "ADD B, #1",
-        "STR A, B",
-
-        "MOV A, #111",           // 'o'
-        "ADD B, #1",
-        "STR A, B",
-
-        "MOV A, #2",
-        "MOV B, #0x0F",
-        "MSL B, [#1 #4]",
-        "MSL B, [#1 #7]",
-        "MSL B, [#0 #1]",
-        "STR A, B",             // flushes the stdout
-
-        // now waits user input
-        "MOV A, #0",
-        "SUB SP, #2",            // place a flag into stack
-                                // to define the end of the user input
-        "STR A, SP",
-
-        "MOV B, #0x0F",
-        "MSL B, [#1 #4]",
-        "MSL B, [#1 #6]",
-        "MSL B, [#0 #2]",       // B has add 0xF104 that reads the keyboard state
-
-        "LDR A, B",             // loads keyboard status into stack
-        "EQ A, #0",             // keyboard buffer is empty, wait input
-        "CJP #60",
-
-        "SUB SP, #2",
-        "MOV B, #0x0F",
-        "MSL B, [#1 #4]",
-        "MSL B, [#1 #6]",
-        "MSL B, [#1 #2]",       // B has addr 0xF105 that reads the keyboard buffer
-
-        "LDR A, B",
-        "STR A, SP",
-
-        "MOV C, #13",           // only stops if the user hits enter
-        "NEQ A, C",
-        "CJP #52",
-
-        "MOV B, #0x0F",         // print user input
-        "MSL B, [#0 #7]",
-        "MSL B, [#0 #5]",
-
-        "STR SP, C",
-        "ADD SP, #2",
-        "EQ C, #0",
-        "CJP #90",
-
-        "STR C, B",            // zero-terminated string
-        "ADD B, #1",
-        "CJP #72",
-
-        "MOV A, #2",
-        "MOV B, #0x0F",
-        "MSL B, [#1 #4]",
-        "MSL B, [#1 #7]",
-        "MSL B, [#0 #1]",
-        "STR A, B",             // flushes the stdout
-
-        "ADD FLAGS, #1",        // halt machine
-    };
-*/
 
 pub fn main() -> () {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
+    if args.len() < 2 {
         eprintln!("expected 1 positional arg, received {}", args.len() - 1);
         return;
     }
+
+    let is_debug = if let Some(last_arg) = args.last() {
+        last_arg.eq(&String::from("--debug"))
+    } else {
+        false
+    };
 
     let path = Path::new(&args[1]);
     let open_file = File::open(path);
@@ -144,14 +70,21 @@ pub fn main() -> () {
     // define the stack pointer to the memory end;
     machine.set_register(Register::SP, 0xFFFF);
 
-
     loop {
+        if is_debug {
+            match Terminal256::read_from_stdin().unwrap() {
+                TerminalAction::KeyPressed(c) if c == 'q' => break,
+                TerminalAction::KeyPressedEnter => {}
+                _ => continue
+            }
+        }
+
         let r = machine.step();
         match r {
             Ok(State::Continue) => continue,
             Ok(State::Stop) => break,
             Err(err) => {
-                println!("error: {:?}", err);
+                print!("error: {:?}\r\n", err);
                 break;
             }
         }
