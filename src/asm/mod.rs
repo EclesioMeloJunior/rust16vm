@@ -401,6 +401,7 @@ pub fn parse_assembly_line<'a>(
 
     let instruction = parts[0].to_uppercase();
     let parser: ParserFn = match instruction.as_str() {
+        "DBG" => Box::new(parse_dbg),
         "MOV" => Box::new(parse_mov),
         "MSL" => Box::new(parse_mov_shift(true)),
         "MSR" => Box::new(parse_mov_shift(false)),
@@ -616,6 +617,10 @@ fn parse_copy(args: &[&str]) -> Result<Instruction, AsmError> {
 
 fn parse_ret(_args: &[&str]) -> Result<Instruction, AsmError> {
     return Ok(Instruction::CallRet(true, 0));
+}
+
+fn parse_dbg(_args: &[&str]) -> Result<Instruction, AsmError> {
+    return Ok(Instruction::Noop);
 }
 
 fn parse_mov(args: &[&str]) -> Result<Instruction, AsmError> {

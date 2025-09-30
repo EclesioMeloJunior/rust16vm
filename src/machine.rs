@@ -299,11 +299,13 @@ impl TryFrom<u16> for Instruction {
 pub struct Machine<M: Addressable> {
     registers: [u16; 8],
     memory: M,
+    is_debug: bool,
 }
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 pub enum State {
     Continue,
+    Debug,
     Stop,
 }
 
@@ -312,11 +314,31 @@ impl<M: Addressable> Machine<M> {
         Self {
             registers: [0; 8],
             memory: mem,
+            is_debug: false,
+        }
+    }
+
+    pub fn new_debug(mem: M, is_debug: bool) -> Self {
+        Self { 
+            registers: [0; 8],
+            memory: mem,
+            is_debug: is_debug,
         }
     }
 
     pub fn set_register(&mut self, reg: Register, value: u16) {
         self.registers[reg as usize] = value;
+    }
+
+    pub fn read_from_memory(&mut self, addr: u16, size: u16) -> Vec<u8> {
+        let mut output = vec![];
+        for curr in addr..(addr+size) {
+            match self.memory.read(curr) {
+                Some(value) => output.push(value),
+                None => break,
+            }
+        }
+        output
     }
 
     pub fn step(&mut self) -> Result<State, String> {
@@ -336,6 +358,14 @@ impl<M: Addressable> Machine<M> {
         }
 
         match inst {
+            Instruction::Noop => {
+                self.registers[Register::PC as usize] += 2;
+                if self.is_debug {
+                    return Ok(State::Debug);
+                } else {
+                    return Ok(State::Continue);
+                }
+            }
             Instruction::Mov(dst_reg, reg, imm) => {
                 match (reg, imm) {
                     (Some(src_reg), None) => {
