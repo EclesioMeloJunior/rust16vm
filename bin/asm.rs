@@ -56,7 +56,9 @@ fn main() -> Result<(), ()> {
                     }
                 }
 
-                let instructions = match resolve_and_parse_assembly(asm_str.as_ref()) {
+                let instructions = match resolve_and_parse_assembly(
+                    asm_str.as_ref(),
+                ) {
                     Ok(instructions) => instructions,
                     Err(err) => {
                         eprintln!("resolving input file {}: {:?}", input, err);
