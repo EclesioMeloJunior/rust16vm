@@ -1,6 +1,6 @@
 use std::env::{self};
 use std::fs::File;
-use std::io::{BufReader, Read, prelude::*};
+use std::io::{BufReader, Read, prelude::*, stdout};
 use std::path::Path;
 
 use crossterm::terminal as crossterm_terminal;
@@ -66,27 +66,105 @@ pub fn main() -> () {
 
     memory.register_device(terminal, 0xF000, 259).unwrap();
 
-    let mut machine = Machine::new(memory);
+    let mut machine = Machine::new_debug(memory, is_debug);
     // define the stack pointer to the memory end;
     machine.set_register(Register::SP, 0xFFFF);
 
+    let mut stdout = stdout();
+    let mut hit_dbg = false;
+    
     loop {
         if is_debug {
-            match Terminal256::read_from_stdin().unwrap() {
-                TerminalAction::KeyPressed(c) if c == 'q' => break,
-                TerminalAction::KeyPressedEnter => {}
-                _ => continue
-            }
+            if hit_dbg {
+                hit_dbg = false;
+                match Terminal256::read_from_stdin().unwrap() {
+                    TerminalAction::KeyPressed(c) if c == 'q' => break,
+                    TerminalAction::KeyPressed(c) if c == 's' => {
+                        hit_dbg = true;
+                    },
+                    TerminalAction::KeyPressed(c) if c == 'r' => {
+                        print!("reading from stack:\r\n");
+
+                        let mut text_mem_address = String::new();
+                        loop {
+                            let action = Terminal256::read_from_stdin();
+                            match action  {
+                                Ok(TerminalAction::NumberPressed(n)) => {
+                                    print!("{}", n);
+                                    stdout.flush().unwrap();
+                                    text_mem_address.push(n);
+                                }
+                                Ok(TerminalAction::KeyPressedBackspace) => {
+                                    // Erase the last character
+                                    print!("\u{8} \u{8}"); // Move cursor back, print space, move cursor back again
+                                    stdout.flush().unwrap(); // Ensure the changes are written
+                                    text_mem_address.remove(text_mem_address.len()-1);
+                                }
+                                Ok(TerminalAction::KeyPressedEnter) => break,
+                                _ => {}
+                            }
+                        }
+                        print!("\r\n");
+
+                        let mut text_size = String::new();
+                        loop {
+                            let action = Terminal256::read_from_stdin();
+                            match action  {
+                                Ok(TerminalAction::NumberPressed(n)) => {
+                                    print!("{}", n);
+                                    stdout.flush().unwrap();
+                                    text_size.push(n);
+                                }
+                                Ok(TerminalAction::KeyPressedBackspace) => {
+                                    // Erase the last character
+                                    print!("\u{8} \u{8}"); // Move cursor back, print space, move cursor back again
+                                    stdout.flush().unwrap(); // Ensure the changes are written
+                                    text_size.remove(text_size.len()-1);
+                                }
+                                Ok(TerminalAction::KeyPressedEnter) => break,
+                                _ => {}
+                            }
+                        }
+                        print!("\r\n");
+
+                        let mem_addr: u16 = text_mem_address.parse().unwrap();
+                        let size: u16 = text_size.parse().unwrap();
+                        let output = machine.read_from_memory(mem_addr, size);
+
+                        for (idx, value) in output.iter().enumerate() {
+                            print!(
+                                "{}:\t{:#010b} | {:#04x} | {}\r\n",
+                                mem_addr + (idx as u16),
+                                value,
+                                value,
+                                value
+                            );
+                        }
+                        stdout.flush().unwrap(); // Ensure the changes are written
+                        hit_dbg = true;
+                        continue;
+                    },
+                    TerminalAction::KeyPressedEnter => {}
+                    _ => continue
+                }
+            }            
         }
 
         let r = machine.step();
         match r {
             Ok(State::Continue) => continue,
             Ok(State::Stop) => break,
+            Ok(State::Debug) => {
+                hit_dbg = true;
+                continue;
+            }
             Err(err) => {
                 print!("error: {:?}\r\n", err);
+                _ = stdout.flush().unwrap();
                 break;
             }
         }
     }
+
+    
 }

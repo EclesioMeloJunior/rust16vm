@@ -305,6 +305,7 @@ pub struct Machine<M: Addressable> {
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
 pub enum State {
     Continue,
+    Debug,
     Stop,
 }
 
@@ -329,6 +330,17 @@ impl<M: Addressable> Machine<M> {
         self.registers[reg as usize] = value;
     }
 
+    pub fn read_from_memory(&mut self, addr: u16, size: u16) -> Vec<u8> {
+        let mut output = vec![];
+        for curr in addr..(addr+size) {
+            match self.memory.read(curr) {
+                Some(value) => output.push(value),
+                None => break,
+            }
+        }
+        output
+    }
+
     pub fn step(&mut self) -> Result<State, String> {
         let halt = self.registers[Register::FLAGS as usize] & 0b1 == 1;
         if halt {
@@ -346,6 +358,14 @@ impl<M: Addressable> Machine<M> {
         }
 
         match inst {
+            Instruction::Noop => {
+                self.registers[Register::PC as usize] += 2;
+                if self.is_debug {
+                    return Ok(State::Debug);
+                } else {
+                    return Ok(State::Continue);
+                }
+            }
             Instruction::Mov(dst_reg, reg, imm) => {
                 match (reg, imm) {
                     (Some(src_reg), None) => {
