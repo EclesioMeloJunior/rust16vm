@@ -299,6 +299,7 @@ impl TryFrom<u16> for Instruction {
 pub struct Machine<M: Addressable> {
     registers: [u16; 8],
     memory: M,
+    is_debug: bool,
 }
 
 #[derive(PartialEq, PartialOrd, Clone, Copy, Debug)]
@@ -312,6 +313,15 @@ impl<M: Addressable> Machine<M> {
         Self {
             registers: [0; 8],
             memory: mem,
+            is_debug: false,
+        }
+    }
+
+    pub fn new_debug(mem: M, is_debug: bool) -> Self {
+        Self { 
+            registers: [0; 8],
+            memory: mem,
+            is_debug: is_debug,
         }
     }
 
