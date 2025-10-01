@@ -27,7 +27,10 @@ const TERM_FLAG_ERROR: u8 = 0b10;
 
 pub enum TerminalAction {
     KeyPressed(char),
-    KeyPressedEnter
+    KeyPressedEnter,
+    KeyPressedBackspace,
+    Unknown,
+    NumberPressed(char),
 }
 
 pub struct Terminal256 {
@@ -56,12 +59,14 @@ impl Terminal256 {
             // Blocks until an `Event` is available
             match read()? {
                 Event::Key(event) => {
-                    if event.code == KeyCode::Char('q') {
-                        return Ok(TerminalAction::KeyPressed('q'));
-                    }
-
-                    if event.code == KeyCode::Enter {
-                        return Ok(TerminalAction::KeyPressedEnter);
+                    return match event.code {
+                        KeyCode::Char(keyboard_key) => match keyboard_key {
+                            '0'..='9' => Ok(TerminalAction::NumberPressed(keyboard_key)),
+                            _ => Ok(TerminalAction::KeyPressed(keyboard_key)),
+                        }
+                        KeyCode::Backspace => Ok(TerminalAction::KeyPressedBackspace),
+                        KeyCode::Enter => Ok(TerminalAction::KeyPressedEnter),
+                        _ => Ok(TerminalAction::Unknown),
                     }
                 },
                 _ => {} // Handle other event types if necessary
