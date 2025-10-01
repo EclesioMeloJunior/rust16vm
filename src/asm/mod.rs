@@ -792,11 +792,11 @@ mod test {
             Instruction::Arith(Register::BP, Some(Register::A), None, ArithmeticOp::Div)
         );
 
-        let input = "STR SP, A";
+        let input = "STR A, SP";
         let inst = parse_assembly_line(input, &empty).unwrap();
         assert_eq!(
             inst,
-            Instruction::LdrStr(Register::SP, Register::A, true, 0)
+            Instruction::LdrStr(Register::A, Register::SP, true, 0)
         );
 
         let input = "LDR C, [SP #4]";

@@ -1,0 +1,12 @@
+MOV A, #13
+MOV B, #4
+
+DBG
+
+ADD FLAGS, #2
+SUB SP, #2
+DIV A, B
+LDR C, SP
+ADD SP, #2
+
+ADD FLAGS, #1

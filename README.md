@@ -148,7 +148,7 @@ To calculate the modulo (remainder of a division) of two numbers you should set 
 ```
 OR FLAGS, #2 //sets the bit at position 1 to be `1`
 DIV A, B     // performs the division
-LDR SP, C    // gets from the stack the module and store in C
+LDR C, SP   // gets from the stack the module and store in C
 ```
 
 #### EXPR {dst_register}, {base_reg}, {exponent_reg}
@@ -180,7 +180,7 @@ CPY A, B // where A and B holds memory addresses
 Loads a 2 bytes value from memory into `destination_register`
 
 ```
-LDR SP, A // loads a value in the stack into the register A
+LDR A, SP // loads a value in the stack into the register A
 ```
 
 #### STR {src_register} {addr_register}
@@ -196,7 +196,7 @@ Stores a 2 bytes value stored in `src_register` in the memory using the address 
 Loads a 1 byte value from memory into `destination_register`
 
 ```
-LDB SP, A // loads a value in the stack into the register A
+LDB A, SP // loads a value in the stack into the register A
 ```
 
 #### STB {src_register} {addr_register}
