@@ -3,7 +3,7 @@ use std::{
     usize,
 };
 use crossterm::{
-    cursor, event::{read, Event, KeyCode}, execute, style::{self, Print, Stylize}, terminal::{self, Clear, ClearType}, ExecutableCommand, QueueableCommand
+    cursor, event::{read, Event, KeyCode, KeyEventKind}, execute, style::{self, Print, Stylize}, terminal::{self, Clear, ClearType}, ExecutableCommand, QueueableCommand
 };
 
 use super::Device;
@@ -59,6 +59,7 @@ impl Terminal256 {
             // Blocks until an `Event` is available
             match read()? {
                 Event::Key(event) => {
+                    if event.kind == KeyEventKind::Release{continue;}
                     return match event.code {
                         KeyCode::Char(keyboard_key) => match keyboard_key {
                             '0'..='9' => Ok(TerminalAction::NumberPressed(keyboard_key)),
