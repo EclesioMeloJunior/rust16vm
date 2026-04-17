@@ -1,0 +1,29 @@
+DBG
+
+MOV A, #100
+MOV B, #200
+MOV C, #150
+
+SUB SP, #2
+STR A, SP
+
+SUB SP, #2
+STR B, SP
+
+SUB SP, #2
+STR C, SP
+
+MOV A, #0
+MOV B, #0
+MOV C, #0
+
+LDR C, SP
+ADD SP, #2
+
+LDR B, SP
+ADD SP, #2
+
+LDR A, SP
+ADD SP, #2
+
+ADD FLAGS, #1
