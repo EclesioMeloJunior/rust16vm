@@ -99,7 +99,7 @@ impl TryFrom<usize> for CompareOp {
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Instruction {
     Noop,
-
+ 
     // Format: 0001 | reg(3) |flag(1) |[flag == 1]reg(3),[flag == 0]imm(8)
     Mov(Register, Option<Register>, Option<u16>),
 
@@ -984,5 +984,41 @@ mod test {
         assert_eq!(machine.registers[Register::B as usize], 10);
 
         machine.print_regs();
+    }
+
+    #[test]
+    fn run_mdc_algorithm() {
+        let program = rv16asm! {
+            "MOV A, #48",
+            "MOV B, #16",
+            
+
+            "EQ B, #0",
+            "CJP #26",
+            "ADD FLAGS, #2",
+
+            "SUB SP, #2",
+            "DIV A, B",
+            "LDR C, SP",
+            "ADD SP, #2",
+
+            "SUB FLAGS, #2",
+            "MOV A, B",
+            "MOV B, C",
+            "JMP #4",
+            "ADD FLAGS #1"
+        };
+
+        let mut mem = LinearMemory::new(1024);
+        assert!(mem.write_program(&program));
+
+        let mut machine = Machine::new(mem);
+        machine.set_register(Register::SP, 1024);
+
+        while let Ok(State::Continue) = machine.step() {
+        }
+        assert_eq!(machine.registers[Register::A as usize], 16);
+        machine.print_regs();
+
     }
 }

@@ -1,0 +1,56 @@
+MOV A, #7
+ADD A, #48
+MOV C, #0x0F
+MSL C, [#0 #7]
+MSL C, [#0 #5]
+STR A, C
+
+MOV A, #88
+ADD C, #1
+STR A, C
+
+MOV B, #2
+ADD B, #48
+ADD C, #1
+STR B, C
+
+MOV A, #61
+ADD C, #1
+STR A, C
+
+MOV M, #9
+MUL M, #9
+
+GTE M, #10
+CJP DESMONTAR
+ADD C, #1
+ADD M, #48
+STR M, C
+
+DESMONTAR:
+MOV A, M
+ADD FLAGS, #2
+SUB SP, #2
+DIV A, #10
+LDR A, SP
+ADD SP, #2
+SUB FLAGS, #2
+
+DIV M, #10
+ADD M, #48
+ADD C, #1
+STR M, C
+
+ADD A, #48
+ADD C, #1
+STR A, C
+
+
+MOV A, #2
+MOV B, #0x0F
+MSL B, [#1 #4]
+MSL B, [#1 #7]
+MSL B, [#0 #1]
+STR A, B
+
+ADD FLAGS, #1
