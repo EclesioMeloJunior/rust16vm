@@ -600,14 +600,18 @@ mod test {
     use super::Machine;
 
     #[test]
-    fn invalid_instruction_opcode() {
+    fn noop_opcode() {
         let mut mem = LinearMemory::new(1024);
         mem.write2(0, 0 as u16);
         let mut machine = Machine::new(mem);
 
-        let result = machine.step();
-        assert!(result.is_err());
-        assert_eq!(Err(String::from("invalid instruction: Noop")), result);
+        let result = machine.step().unwrap();
+
+        if machine.is_debug {
+            assert_eq!(result, State::Debug);
+        } else {
+            assert_eq!(result, State::Continue);
+        }
     }
 
     #[test]
@@ -949,13 +953,14 @@ mod test {
             "MOV B, #5",
 
             "EXPR C, A, B",
+            "ADD FLAGS, #1",
         };
 
         let mut mem = LinearMemory::new(66000);
         assert!(mem.write_program(&program));
 
         let mut machine = Machine::new(mem);
-        while let Ok(_) = machine.step() {
+        while let Ok(State::Continue) = machine.step() {
         }
     
         machine.print_regs();
@@ -970,8 +975,6 @@ mod test {
             "MOV B, A",
             
             "ADD FLAGS, #1",
-
-
         };
         let mut mem = LinearMemory::new(1024);
         assert!(mem.write_program(&program));
