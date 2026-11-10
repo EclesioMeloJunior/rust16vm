@@ -1,9 +1,6 @@
 use crate::machine::{ArithmeticOp, CompareOp, Instruction, Register};
 use std::{
     collections::{HashMap, hash_map::Entry},
-    env::args,
-    fmt::format,
-    hash::Hash,
     str::FromStr,
 };
 
@@ -37,28 +34,30 @@ impl FromStr for Register {
     }
 }
 
-impl ToString for Instruction {
-    fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for Instruction {
+    // the display is a flat ladder mirroring the instruction set on purpose
+    #[allow(clippy::too_many_lines)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
             Instruction::Noop => "NOOP".to_string(),
 
             Instruction::Mov(reg, Some(src_reg), None) => {
-                format!("MOV {}, {}", reg.to_string(), src_reg.to_string())
+                format!("MOV {reg}, {src_reg}")
             }
             Instruction::Mov(reg, None, Some(imm)) => {
-                format!("MOV {}, #{}", reg.to_string(), imm)
+                format!("MOV {reg}, #{imm}")
             }
-            
-            
+
+
             Instruction::MovShift(reg, shift_amt, is_left, imm) => {
                 if *is_left {
-                    format!("MSL {}, [#{} #{}]", reg.to_string(), shift_amt, imm)
+                    format!("MSL {reg}, [#{shift_amt} #{imm}]")
                 } else {
-                    format!("MSR {}, [#{} #{}]", reg.to_string(), shift_amt, imm)
+                    format!("MSR {reg}, [#{shift_amt} #{imm}]")
                 }
             }
             Instruction::Cpy(src_reg, dst_reg) => {
-                format!("CPY {}, {}", src_reg.to_string(), dst_reg.to_string())
+                format!("CPY {src_reg}, {dst_reg}")
             }
             Instruction::Arith(reg, opt_reg, opt_imm, op) => {
                 let op = match op {
@@ -71,12 +70,12 @@ impl ToString for Instruction {
 
                 let operand = match (opt_reg, opt_imm) {
                     (Some(reg), None) => reg.to_string(),
-                    (None, Some(imm)) => format!("#{}", imm.to_string()),
-                    _ => format!("undefined"),
+                    (None, Some(imm)) => format!("#{imm}"),
+                    _ => "undefined".to_string(),
                 };
 
-                format!("{} {}, {}", op.to_string(), reg.to_string(), operand)
-            } 
+                format!("{op}, {reg}, {operand}")
+            }
             Instruction::ArithRegReg(dst_reg, fst_reg, snd_reg, op) => {
                 let op = match op {
                     ArithmeticOp::Add => "ADDR",
@@ -88,7 +87,7 @@ impl ToString for Instruction {
                     ArithmeticOp::Sqrt => "SQRTR",
                 };
 
-                format!("{} {}, {}, {}", op.to_string(), dst_reg.to_string(), fst_reg.to_string(), snd_reg.to_string())
+                format!("{op}, {dst_reg}, {fst_reg}, {snd_reg}")
             }
             Instruction::LdrStr(reg, rhs_reg, is_str, shift) => {
                 let op = if *is_str { "STR" } else { "LDR" };
@@ -96,15 +95,10 @@ impl ToString for Instruction {
                 let rhs = if *shift == 0 {
                     rhs_reg.to_string()
                 } else {
-                    format!("[{} #{}]", rhs_reg.to_string(), shift.to_string())
+                    format!("[{rhs_reg} #{shift}]")
                 };
 
-                format!(
-                    "{} {}, {}",
-                    op.to_string(),
-                    reg.to_string(),
-                    rhs.to_string(),
-                )
+                format!("{op}, {reg}, {rhs}")
             }
             Instruction::LdbStb(reg, rhs_reg, is_str, shift) => {
                 let op = if *is_str { "STB" } else { "LDB" };
@@ -112,33 +106,28 @@ impl ToString for Instruction {
                 let rhs = if *shift == 0 {
                     rhs_reg.to_string()
                 } else {
-                    format!("[{} #{}]", rhs_reg.to_string(), shift.to_string())
+                    format!("[{rhs_reg} #{shift}]")
                 };
 
-                format!(
-                    "{} {}, {}",
-                    op.to_string(),
-                    reg.to_string(),
-                    rhs.to_string(),
-                )
+                format!("{op}, {reg}, {rhs}")
             }
             Instruction::Jmp(opt_reg, opt_imm) => {
                 let src = match (opt_reg, opt_imm) {
                     (Some(reg), None) => reg.to_string(),
-                    (None, Some(imm)) => format!("#{}", imm.to_string()),
+                    (None, Some(imm)) => format!("#{imm}"),
                     _ => "undefined".to_string(),
                 };
 
-                format!("JMP {}", src)
+                format!("JMP {src}")
             }
             Instruction::CondJmp(opt_reg, opt_imm) => {
                 let src = match (opt_reg, opt_imm) {
                     (Some(reg), None) => reg.to_string(),
-                    (None, Some(imm)) => format!("#{}", imm.to_string()),
+                    (None, Some(imm)) => format!("#{imm}"),
                     _ => "undefined".to_string(),
                 };
 
-                format!("CJP {}", src)
+                format!("CJP {src}")
             }
             Instruction::Cmp(reg, opt_reg, opt_imm, op) => {
                 let op = match op {
@@ -152,26 +141,30 @@ impl ToString for Instruction {
 
                 let operand = match (opt_reg, opt_imm) {
                     (Some(reg), None) => reg.to_string(),
-                    (None, Some(imm)) => format!("#{}", imm.to_string()),
-                    _ => format!("undefined"),
+                    (None, Some(imm)) => format!("#{imm}"),
+                    _ => "undefined".to_string(),
                 };
 
-                format!("{} {}, {}", op.to_string(), reg.to_string(), operand)
+                format!("{op}, {reg}, {operand}")
             }
             Instruction::CallRet(is_ret, addr) => {
                 if *is_ret {
-                    return "RET".to_string();
+                    "RET".to_string()
+                } else {
+                    format!("CALL #{addr}")
                 }
-
-                format!("CALL #{}", addr.to_string())
             }
-            _=>{
+            Instruction::Mov(..)=>{
                 unreachable!()
             }
-        }
+        };
+
+        write!(f, "{string}")
     }
 }
 
+// one flat ladder per opcode on purpose; splitting hurts readability here
+#[allow(clippy::too_many_lines)]
 pub fn encode_instruction(inst: &Instruction) -> u16 {
     match inst {
         Instruction::Noop => 0,
@@ -261,7 +254,7 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
         Instruction::Jmp(opt_reg, opt_imm) => {
             let (mode, value) = match (opt_reg, opt_imm) {
                 (Some(reg), None) => (0b1, (*reg as u16) & 0b111),
-                (None, Some(imm)) => (0b0, (*imm as u16) & 0b11111111111),
+                (None, Some(imm)) => (0b0, *imm & 0b11111111111),
                 _ => unreachable!(),
             };
             (value << 5) | (mode << 4) | 0b0110
@@ -269,7 +262,7 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
         Instruction::CondJmp(opt_reg, opt_imm) => {
             let (mode, value) = match (opt_reg, opt_imm) {
                 (Some(reg), None) => (0b1, (*reg as u16) & 0b111),
-                (None, Some(imm)) => (0b0, (*imm as u16) & 0b11111111111),
+                (None, Some(imm)) => (0b0, *imm & 0b11111111111),
                 _ => unreachable!(),
             };
             (value << 5) | (mode << 4) | 0b0101
@@ -279,21 +272,21 @@ pub fn encode_instruction(inst: &Instruction) -> u16 {
             let cmp = (*cmp_op as u16) & 0b111;
             let (mode, value) = match (opt_reg, opt_imm) {
                 (Some(reg), None) => (0b1, (*reg as u16) & 0b111),
-                (None, Some(imm)) => (0b0, (*imm as u16) & 0b11111),
+                (None, Some(imm)) => (0b0, *imm & 0b11111),
                 _ => unreachable!(),
             };
             (value << 11) | (mode << 10) | (cmp << 7) | (r0 << 4) | 0b0111
         }
         Instruction::CallRet(is_ret, addr) => {
             let imm = *addr & 0b11111111111;
-            let flag = if *is_ret { 0b1 } else { 0b0 };
+            let flag = u16::from(*is_ret);
 
             (imm << 5) | ((flag & 0b1) << 4) | 0b1011
         },
     }
 }
 
-pub fn parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmError> {
+pub fn parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmError> {   
     let mut instructions = Vec::new();
 
     let empty_labels = HashMap::new();
@@ -301,8 +294,9 @@ pub fn parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmError> {
     for (idx, line) in code.lines().enumerate() {
         println!("{} -> {}", idx * 2, line);
 
-        let line = line.trim();
-        if line.is_empty() || line.starts_with(";") {
+        // Removes an inline comment (`; ...`) and surrounding whitespace
+        let line = line.split(';').next().unwrap_or("").trim();
+        if line.is_empty() {
             continue;
         }
 
@@ -325,28 +319,28 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
     let mut curr_inst_addr = 0;
     let mut line_number = 0;
 
-    for line in code.lines().into_iter() {
+    for line in code.lines() {
         line_number += 1;
-        let line = line.trim();
+        let line = line.split(';').next().unwrap_or("").trim();
 
-        if line.len() == 0 || line.starts_with(";") {
+        if line.is_empty() {
             // don't need to increase addr
             continue;
         }
 
         // found a label
-        if line.ends_with(":") {
-            let label = line.trim_end_matches(":");
+        if line.ends_with(':') {
+            let label = line.trim_end_matches(':');
 
             // need to figure out how to calculate
             // the instruction address offset
             labels.insert(label.to_string(), curr_inst_addr);
 
             if let Some(unresolved_label_loc) = unresolved.get(label) {
-                for (inst_idx, inst_line) in unresolved_label_loc.iter() {
+                for (inst_idx, inst_line) in unresolved_label_loc {
                     match parse_assembly_line(inst_line.as_ref(), &labels) {
                         Ok(inst) => instructions[*inst_idx] = inst,
-                        Err(err) => eprintln!("while resolving label: {:?}", err),
+                        Err(err) => eprintln!("while resolving label: {err:?}"),
                     }
                 }
 
@@ -356,7 +350,7 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
             continue;
         }
 
-        match parse_assembly_line(line.as_ref(), &labels) {
+        match parse_assembly_line(line, &labels) {
             Ok(inst) => instructions.push(inst),
             Err(AsmError::UnresolvedLabel(label)) => {
                 instructions.push(Instruction::Noop);
@@ -370,10 +364,10 @@ pub fn resolve_and_parse_assembly(code: &str) -> Result<Vec<Instruction>, AsmErr
                     Entry::Vacant(entry) => {
                         entry.insert(vec![(instructions.len() - 1, line.to_string())]);
                     }
-                };
+                }
             }
             Err(err) => {
-                eprintln!("problems at line: {}: {}", line_number, line.to_string());
+                eprintln!("problems at line: {line_number}: {line}");
                 return Err(err)
             },
         }
@@ -390,9 +384,9 @@ pub fn encode_instructions(instructions: &[Instruction]) -> Vec<u16> {
 
 type ParserFn<'a> = Box<dyn Fn(&[&str]) -> Result<Instruction, AsmError> + 'a>;
 
-pub fn parse_assembly_line<'a>(
+pub fn parse_assembly_line(
     line: &str,
-    labels: &'a HashMap<String, u16>,
+    labels: &HashMap<String, u16>,
 ) -> Result<Instruction, AsmError> {
     let parts: Vec<&str> = line.split_whitespace().collect();
     if parts.is_empty() {
@@ -444,9 +438,9 @@ fn parse_comparision(cmp_op: CompareOp) -> impl Fn(&[&str]) -> Result<Instructio
             return Err(AsmError::InvalidInstruction);
         }
 
-        let r0 = args[0].trim_end_matches(",").parse::<Register>()?;
+        let r0 = args[0].trim_end_matches(',').parse::<Register>()?;
 
-        let (opt_reg, opt_imm) = if args[1].starts_with("#") {
+        let (opt_reg, opt_imm) = if args[1].starts_with('#') {
             (None, Some(parse_immediate(args[1])?))
         } else {
             (Some(args[1].parse::<Register>()?), None)
@@ -456,23 +450,23 @@ fn parse_comparision(cmp_op: CompareOp) -> impl Fn(&[&str]) -> Result<Instructio
     }
 }
 
-fn parse_jmp<'a>(
+fn parse_jmp(
     cond: bool,
-    labels: &'a HashMap<String, u16>,
+    labels: &HashMap<String, u16>,
 ) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
     move |args: &[&str]| -> Result<Instruction, AsmError> {
         if args.len() != 1 {
             return Err(AsmError::InvalidInstruction);
         }
 
-        let (opt_reg, opt_imm) = if args[0].starts_with("#") {
+        let (opt_reg, opt_imm) = if args[0].starts_with('#') {
             (None, Some(parse_immediate(args[0])?))
         } else {
             match args[0].parse::<Register>() {
                 Ok(reg) => (Some(reg), None),
                 Err(_) => {
                     if let Some(jmp_addr) = labels.get(args[0]) {
-                        (None, Some(jmp_addr.clone()))
+                        (None, Some(*jmp_addr))
                     } else {
                         return Err(AsmError::UnresolvedLabel(args[0].to_string()));
                     }
@@ -488,22 +482,20 @@ fn parse_jmp<'a>(
     }
 }
 
-fn parse_call<'a>(
-    labels: &'a HashMap<String, u16>,
+fn parse_call(
+    labels: &HashMap<String, u16>,
 ) -> impl Fn(&[&str]) -> Result<Instruction, AsmError> {
     move |args: &[&str]| -> Result<Instruction, AsmError> {
         if args.len() != 1 {
             return Err(AsmError::InvalidInstruction);
         }
 
-        let addr = if args[0].starts_with("#") {
+        let addr = if args[0].starts_with('#') {
             parse_immediate(args[0])?
+        } else if let Some(jmp_addr) = labels.get(args[0]) {
+            *jmp_addr
         } else {
-            if let Some(jmp_addr) = labels.get(args[0]) {
-                *jmp_addr
-            } else {
-                return Err(AsmError::UnresolvedLabel(args[0].to_string()));
-            }
+            return Err(AsmError::UnresolvedLabel(args[0].to_string()));
         };
 
         return Ok(Instruction::CallRet(false, addr));
@@ -523,9 +515,8 @@ fn parse_ldr_str(is_byte: bool, is_str: bool) -> impl Fn(&[&str]) -> Result<Inst
             let reg_src = args[1].parse::<Register>()?;
             if is_byte {
                 return Ok(Instruction::LdbStb(reg_dst, reg_src, is_str, 0));
-            } else {
-                return Ok(Instruction::LdrStr(reg_dst, reg_src, is_str, 0));
             }
+            return Ok(Instruction::LdrStr(reg_dst, reg_src, is_str, 0));
         }
 
         let reg_src = args[1].trim_start_matches('[').parse::<Register>()?;
@@ -589,16 +580,11 @@ fn parse_arithmetic_reg_reg(op: ArithmeticOp) -> impl Fn(&[&str]) -> Result<Inst
 }
 
 fn parse_immediate(s: &str) -> Result<u16, AsmError> {
-    if s.starts_with("#") {
-        let value = &s[1..];
-
-        if value.starts_with("0x") {
-            let value = &value[2..];
-            dbg!();
-            return u16::from_str_radix(value, 16).map_err(|_| AsmError::InvalidImmediate);
-        } else {
-            return value.parse::<u16>().map_err(|_| AsmError::InvalidImmediate);
+    if let Some(value) = s.strip_prefix('#') {
+        if let Some(hex) = value.strip_prefix("0x") {
+            return u16::from_str_radix(hex, 16).map_err(|_| AsmError::InvalidImmediate);
         }
+        return value.parse::<u16>().map_err(|_| AsmError::InvalidImmediate);
     }
 
     Err(AsmError::InvalidImmediate)
@@ -615,10 +601,14 @@ fn parse_copy(args: &[&str]) -> Result<Instruction, AsmError> {
     Ok(Instruction::Cpy(src_reg, dst_reg))
 }
 
+// the parser table below stores `Box<dyn Fn(&[&str]) -> Result<Instruction, AsmError>>`;
+// these trivial parsers must keep the `Result` to match that signature
+#[allow(clippy::unnecessary_wraps)]
 fn parse_ret(_args: &[&str]) -> Result<Instruction, AsmError> {
     return Ok(Instruction::CallRet(true, 0));
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn parse_dbg(_args: &[&str]) -> Result<Instruction, AsmError> {
     return Ok(Instruction::Noop);
 }
@@ -655,8 +645,8 @@ fn parse_mov_shift(dir: bool) -> impl Fn(&[&str]) -> Result<Instruction, AsmErro
 
         let reg = args[0].trim_end_matches(',').parse::<Register>()?;
 
-        let value = parse_immediate(args[1].trim_start_matches("["))?;
-        let shift = parse_immediate(args[2].trim_end_matches("]"))?;
+        let value = parse_immediate(args[1].trim_start_matches('['))?;
+        let shift = parse_immediate(args[2].trim_end_matches(']'))?;
 
         Ok(Instruction::MovShift(
             reg,
@@ -723,6 +713,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_assembly_line() {
         let empty = HashMap::new();
 
@@ -857,6 +848,6 @@ mod test {
         assert_eq!(
             inst,
             Instruction::ArithRegReg(Register::C, Register::A, Register::B, ArithmeticOp::Add)
-        )
+        );
     }
 }

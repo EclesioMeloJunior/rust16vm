@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::VecDeque, sync::{Arc, Mutex}, time::Duration};
+use std::{collections::VecDeque, sync::{Arc, Mutex}, time::Duration};
 
 use crossterm::event::{poll, read, Event, KeyCode};
 use super::Device;
@@ -26,34 +26,39 @@ impl Keyboard {
     }
 }
 
+impl Default for Keyboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// stays `async` because `async_std::task::spawn` requires a future
+#[allow(clippy::unused_async)]
 async fn non_blocking_keyboard(keyboard: Arc<Mutex<InnerKeyboard>>) {
     println!("started non blocking keyboard...");
     loop {
         if poll(Duration::from_millis(0)).unwrap() {
             let evt = read().unwrap();
-            match evt {
-                Event::Key(key_evt) => match key_evt.code {
-                    KeyCode::Char(c) => {
-                        {
-                            let mut kb = keyboard.lock().unwrap();
-                            kb.buffer.push_back(c as u8);
-                            kb.flags = BUFFER_NOT_EMPTY;
-                            println!("buffer not empty: {:?}", kb.buffer);
-                        }
-                        keyboard.lock().unwrap().buffer.push_back(c as u8);
+            if let Event::Key(key_evt) = evt { match key_evt.code {
+                KeyCode::Char(c) => {
+                    {
+                        let mut kb = keyboard.lock().unwrap();
+                        kb.buffer.push_back(c as u8);
+                        kb.flags = BUFFER_NOT_EMPTY;
+                        println!("buffer not empty: {:?}", kb.buffer);
                     }
-                    KeyCode::Esc => return,
-                    _ => {}
-                } 
-                _ => {},
-            } 
+                    keyboard.lock().unwrap().buffer.push_back(c as u8);
+                }
+                KeyCode::Esc => return,
+                _ => {}
+            } } 
         }
     } 
 }
 
 impl Device for Keyboard {
     fn read(&self, offset: usize) -> u8 {
-        println!("keyboard read @ {}", offset);
+        println!("keyboard read @ {offset}");
 
         match offset {
             0 => self.0.lock().unwrap().flags,
@@ -61,7 +66,7 @@ impl Device for Keyboard {
                 let mut kb = self.0.lock().unwrap();
                 
                 if let Some(c) = kb.buffer.pop_front() {
-                    if kb.buffer.len() == 0 {
+                    if kb.buffer.is_empty() {
                         kb.flags = BUFFER_EMPTY;
                     }
 
@@ -74,10 +79,8 @@ impl Device for Keyboard {
         }
     }
 
-    fn write(&mut self, offset: usize, _value: u8) {
+    fn write(&mut self, _offset: usize, _value: u8) {
         // should do nothing!
-        match offset {
-            _ => {}
-        }
+        {}
     }
 }

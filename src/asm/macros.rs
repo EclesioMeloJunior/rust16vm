@@ -2,14 +2,10 @@
 macro_rules! rv16asm {
     () => { Vec::<u16>::new() };
 
-    ($inst:expr) => {{
-        use super::{parse_assembly, encode_instructions};
-        let instructions = parse_assembly($instr)
-            .expect(&format!("failed to parse asm: {}", $instr));
+    // delegate to the multi-instruction arm: its `$crate::` paths also
+    // resolve when the macro is used from outside this crate
+    ($inst:expr) => { $crate::rv16asm!($inst,) };
 
-        encode_instructions(&instructions)
-    }};
-        
     ($($inst:expr),* $(,)?) => {{
         use $crate::asm::{parse_assembly, encode_instructions};
         let code = concat!($($inst, "\n"),*);

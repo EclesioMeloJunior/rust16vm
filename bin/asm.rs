@@ -2,7 +2,7 @@ use rust16vm::{
     asm::{encode_instruction, resolve_and_parse_assembly},
     machine::Instruction,
 };
-#[allow(dead_code)]
+
 // asm [output] [input files...]
 
 // asm file.s file.bin -> outputs the encoded instructions
@@ -23,7 +23,7 @@ fn main() -> Result<(), ()> {
         return Err(());
     }
 
-    let output_file = match Extension::try_from(args[1].to_string()) {
+    let output_file = match Extension::try_from(args[1].clone()) {
         Ok(ext) => ext,
         Err(ext_err) => {
             eprintln!("checking output file {} extension: {}", args[1], ext_err);
@@ -32,10 +32,10 @@ fn main() -> Result<(), ()> {
     };
 
     for input in &args[2..] {
-        let _input_file = match Extension::try_from(input.to_string()) {
+        let _input_file = match Extension::try_from(input.clone()) {
             Ok(ext) => ext,
             Err(ext_err) => {
-                eprintln!("checking input file {} extension: {}", input, ext_err);
+                eprintln!("checking input file {input} extension: {ext_err}");
                 return Err(());
             }
         };
@@ -51,7 +51,7 @@ fn main() -> Result<(), ()> {
                 match buf.read_to_string(&mut asm_str) {
                     Ok(_) => {}
                     Err(buf_err) => {
-                        eprintln!("while reading input file {}: {}", input, buf_err);
+                        eprintln!("while reading input file {input}: {buf_err}");
                         return Err(());
                     }
                 }
@@ -61,14 +61,14 @@ fn main() -> Result<(), ()> {
                 ) {
                     Ok(instructions) => instructions,
                     Err(err) => {
-                        eprintln!("resolving input file {}: {:?}", input, err);
+                        eprintln!("resolving input file {input}: {err:?}");
                         return Err(());
                     }
                 };
 
-                match output_file.write_instructions(instructions) {
+                match output_file.write_instructions(&instructions) {
                     Err(err) => {
-                        eprintln!("{}", err);
+                        eprintln!("{err}");
                         return Err(());
                     }
                     Ok(()) => {
@@ -77,7 +77,7 @@ fn main() -> Result<(), ()> {
                 }
             }
             Err(io_err) => {
-                eprintln!("opening {}: {}", input, io_err);
+                eprintln!("opening {input}: {io_err}");
                 return Err(());
             }
         }
@@ -86,19 +86,22 @@ fn main() -> Result<(), ()> {
     Ok(())
 }
 
+// the text payload of `UnresolvedText`/`ResolvedText` is only used to carry
+// the file path around; some variants are matched on but never read
+#[allow(dead_code)]
 enum Extension {
-    BinaryExt(String),
-    UnresolvedTextExt(String),
-    ResolvedTextExt(String),
+    Binary(String),
+    UnresolvedText(String),
+    ResolvedText(String),
 }
 
 impl Extension {
-    pub fn write_instructions(&self, instructions: Vec<Instruction>) -> Result<(), String> {
+    pub fn write_instructions(&self, instructions: &[Instruction]) -> Result<(), String> {
         match self {
-            Extension::BinaryExt(f) => {
+            Extension::Binary(f) => {
                 let encoded: Vec<u16> = instructions
                     .iter()
-                    .map(|inst| encode_instruction(inst))
+                    .map(encode_instruction)
                     .collect();
 
                 let bin_instructions: Vec<u8> =
@@ -106,12 +109,12 @@ impl Extension {
 
                 let mut file = match File::create(f) {
                     Ok(bin_file) => bin_file,
-                    Err(err) => return Err(format!("creating binary file: {}", err)),
+                    Err(err) => return Err(format!("creating binary file: {err}")),
                 };
 
                 match file.write_all(&bin_instructions) {
                     Ok(()) => Ok(()),
-                    Err(err) => Err(format!("writing to binary file: {}", err)),
+                    Err(err) => Err(format!("writing to binary file: {err}")),
                 }
             }
             _ => Err(String::from("not supported")),
@@ -129,10 +132,10 @@ impl TryFrom<String> for Extension {
             .map_or(
                 Err(String::from("could not get file extension")),
                 |ext_str| match ext_str {
-                    "bin" => Ok(Extension::BinaryExt(value)),
-                    "S" => Ok(Extension::ResolvedTextExt(value)),
-                    "s" => Ok(Extension::UnresolvedTextExt(value)),
-                    _ => Err(format!("unsupported extension: {}", ext_str)),
+                    "bin" => Ok(Extension::Binary(value)),
+                    "S" => Ok(Extension::ResolvedText(value)),
+                    "s" => Ok(Extension::UnresolvedText(value)),
+                    _ => Err(format!("unsupported extension: {ext_str}")),
                 },
             )
     }

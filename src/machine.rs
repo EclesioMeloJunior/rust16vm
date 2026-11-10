@@ -21,18 +21,20 @@ pub enum Register {
     FLAGS,
 }
 
-impl ToString for Register {
-    fn to_string(&self) -> String {
-        match self {
-            Register::A => String::from("A"),
-            Register::B => String::from("B"),
-            Register::C => String::from("C"),
-            Register::M => String::from("M"),
-            Register::SP => String::from("SP"),
-            Register::PC => String::from("PC"),
-            Register::BP => String::from("BP"),
-            Register::FLAGS => String::from("FLAGS"),
-        }
+impl std::fmt::Display for Register {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Register::A => "A",
+            Register::B => "B",
+            Register::C => "C",
+            Register::M => "M",
+            Register::SP => "SP",
+            Register::PC => "PC",
+            Register::BP => "BP",
+            Register::FLAGS => "FLAGS",
+        };
+
+        write!(f, "{name}")
     }
 }
 
@@ -49,7 +51,7 @@ impl TryFrom<usize> for Register {
             5 => Ok(Register::PC),
             6 => Ok(Register::BP),
             7 => Ok(Register::FLAGS),
-            _ => Err(format!("invalid register: {}", value)),
+            _ => Err(format!("invalid register: {value}")),
         }
     }
 }
@@ -86,7 +88,7 @@ impl TryFrom<usize> for CompareOp {
             3 => Ok(CompareOp::LessEq),
             4 => Ok(CompareOp::Greater),
             5 => Ok(CompareOp::GreaterEq),
-            _ => Err(format!("invalid compare opcode: {}", value)),
+            _ => Err(format!("invalid compare opcode: {value}")),
         }
     }
 }
@@ -153,6 +155,9 @@ pub enum Instruction {
 impl TryFrom<u16> for Instruction {
     type Error = String;
 
+    /// Decodes a 16-bit word into an [`Instruction`]; a flat ladder over the
+    /// opcode table, kept in one piece on purpose.
+    #[allow(clippy::too_many_lines)]
     fn try_from(inst: u16) -> Result<Self, Self::Error> {
         let opcode = inst & 0b1111;
         match opcode {
@@ -167,14 +172,13 @@ impl TryFrom<u16> for Instruction {
                             Some(Register::try_from(((inst >> 8) & 0b111) as usize)?),
                             None,
                         ));
-                } else{
-                    return Ok(
-                        Instruction::Mov(
-                            Register::try_from(reg_dst)?,
-                            None,
-                            Some((inst >> 8) & 0b111111111),
-                        ));
                 }
+                return Ok(
+                    Instruction::Mov(
+                        Register::try_from(reg_dst)?,
+                        None,
+                        Some((inst >> 8) & 0b111111111),
+                    ));
 
             }
             0b0010 => {
@@ -289,9 +293,9 @@ impl TryFrom<u16> for Instruction {
             }
             0b1011 => {
                 let is_ret = ((inst >> 4) & 0b1) == 1;
-                Ok(Instruction::CallRet(is_ret, (inst >> 5) as u16))
+                Ok(Instruction::CallRet(is_ret, inst >> 5))
             }
-            _ => Err(format!("unexpected instruction: {:#06x}", inst)),
+            _ => Err(format!("unexpected instruction: {inst:#06x}")),
         }
     }
 }
@@ -322,12 +326,22 @@ impl<M: Addressable> Machine<M> {
         Self { 
             registers: [0; 8],
             memory: mem,
-            is_debug: is_debug,
+            is_debug,
         }
     }
 
     pub fn set_register(&mut self, reg: Register, value: u16) {
         self.registers[reg as usize] = value;
+    }
+
+    /// Read the current value of a single register.
+    pub fn register(&self, reg: Register) -> u16 {
+        self.registers[reg as usize]
+    }
+
+    /// Snapshot of every register, indexed by `Register as usize`.
+    pub fn registers(&self) -> [u16; 8] {
+        self.registers
     }
 
     pub fn read_from_memory(&mut self, addr: u16, size: u16) -> Vec<u8> {
@@ -341,6 +355,9 @@ impl<M: Addressable> Machine<M> {
         output
     }
 
+    /// Executes a single fetch/decode/execute cycle; the whole interpreter
+    /// lives here on purpose so control flow reads top to bottom.
+    #[allow(clippy::too_many_lines)]
     pub fn step(&mut self) -> Result<State, String> {
         let halt = self.registers[Register::FLAGS as usize] & 0b1 == 1;
         if halt {
@@ -352,19 +369,13 @@ impl<M: Addressable> Machine<M> {
 
         let inst = Instruction::try_from(raw)?;
 
-        if self.is_debug {
-            self.print_regs();
-            print!("{:?} @ {}\r\n", inst, pc);
-        }
-
         match inst {
             Instruction::Noop => {
                 self.registers[Register::PC as usize] += 2;
                 if self.is_debug {
                     return Ok(State::Debug);
-                } else {
-                    return Ok(State::Continue);
                 }
+                return Ok(State::Continue);
             }
             Instruction::Mov(dst_reg, reg, imm) => {
                 match (reg, imm) {
@@ -398,7 +409,7 @@ impl<M: Addressable> Machine<M> {
             }
             Instruction::Arith(dst_reg, src_reg, imm, arith_op) => match (src_reg, imm) {
                 (Some(src), None) => {
-                    self.arithmetic_op(dst_reg, self.registers[src as usize], arith_op)
+                    self.arithmetic_op(dst_reg, self.registers[src as usize], arith_op);
                 }
                 (None, Some(imm)) => self.arithmetic_op(dst_reg, imm, arith_op),
                 _ => unreachable!(),
@@ -416,10 +427,8 @@ impl<M: Addressable> Machine<M> {
 
                         self.set_flags((0b1 << 2) | 0b1);
                     }
-                } else {
-                    if let Some(value) = self.memory.read2(at) {
-                        self.registers[r0 as usize] = value;
-                    }
+                } else if let Some(value) = self.memory.read2(at) {
+                    self.registers[r0 as usize] = value;
                 }
             }
             Instruction::LdbStb(r0, addr_reg, is_str, shift) => {
@@ -432,10 +441,8 @@ impl<M: Addressable> Machine<M> {
 
                         self.set_flags((0b1 << 2) | 0b1);
                     }
-                } else {
-                    if let Some(value) = self.memory.read(at) {
-                        self.registers[r0 as usize] = value as u16;
-                    }
+                } else if let Some(value) = self.memory.read(at) {
+                    self.registers[r0 as usize] = value as u16;
                 }
             }
             Instruction::Jmp(opt_reg, opt_imm) => match (opt_reg, opt_imm) {
@@ -474,11 +481,11 @@ impl<M: Addressable> Machine<M> {
                 let lhs = self.registers[reg as usize];
                 match (opt_reg, opt_imm) {
                     (Some(other_reg), None) => {
-                        self.compare_op(lhs, self.registers[other_reg as usize], op)
+                        self.compare_op(lhs, self.registers[other_reg as usize], op);
                     }
                     (None, Some(imm)) => self.compare_op(lhs, imm, op),
                     _ => unreachable!(),
-                };
+                }
             }
             Instruction::CallRet(is_ret, addr) => {
                 if is_ret {
@@ -493,9 +500,6 @@ impl<M: Addressable> Machine<M> {
 
                 return Ok(State::Continue);
             }
-            _ => {
-                return Err(format!("invalid instruction: {:?}", inst))
-            },
         }
 
         self.registers[Register::PC as usize] += 2;
@@ -551,10 +555,10 @@ impl<M: Addressable> Machine<M> {
             ArithmeticOp::Sub => lhs - rhs,
             ArithmeticOp::Mul => lhs * rhs,
             ArithmeticOp::Div => lhs / rhs,
-            ArithmeticOp::Exp => lhs.pow(rhs as u32) as u16,
+            ArithmeticOp::Exp => lhs.pow(rhs as u32),
             ArithmeticOp::Sqrt => (lhs as f32).sqrt() as u16,
         };
-        self.registers[dst_reg as usize] = result
+        self.registers[dst_reg as usize] = result;
     }
 
     fn compare_op(&mut self, lhs: u16, rhs: u16, op: CompareOp) {
@@ -574,11 +578,11 @@ impl<M: Addressable> Machine<M> {
         }
     }
 
-    pub fn print_regs(&self) -> () {
+    pub fn print_regs(&self) {
         for (idx, value) in self.registers.iter().enumerate() {
             print!(
                 "{}:\t{:#018b} | {:#04x} | {}\r\n",
-                Register::try_from(idx).unwrap().to_string(),
+                Register::try_from(idx).unwrap(),
                 value,
                 value,
                 value
@@ -589,8 +593,6 @@ impl<M: Addressable> Machine<M> {
 
 #[cfg(test)]
 mod test {
-    use std::usize;
-
     use crate::{
         machine::{Register, State},
         memory::{Addressable, LinearMemory},
@@ -602,7 +604,7 @@ mod test {
     #[test]
     fn noop_opcode() {
         let mut mem = LinearMemory::new(1024);
-        mem.write2(0, 0 as u16);
+        mem.write2(0, 0_u16);
         let mut machine = Machine::new(mem);
 
         let result = machine.step().unwrap();
@@ -651,7 +653,7 @@ mod test {
 
                 let mut machine = Machine::new(mem);
                 machine.set_register(Register::SP, 8 * 1024);
-                for _i in 0..inst_len + 1 {
+                for _i in 0..=inst_len {
                     machine.step().unwrap();
                 }
 
@@ -785,7 +787,7 @@ mod test {
             machine.print_regs();
         }
 
-        assert_eq!(machine.registers[Register::FLAGS as usize], 5) 
+        assert_eq!(machine.registers[Register::FLAGS as usize], 5); 
     }
 
     #[test]
@@ -807,7 +809,7 @@ mod test {
         assert_eq!(machine.registers[Register::FLAGS as usize], 0b1000); 
 
         machine.step().unwrap(); 
-        assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000) 
+        assert_eq!(machine.registers[Register::FLAGS as usize], 0b0000); 
     }
 
     #[test]
@@ -851,7 +853,7 @@ mod test {
             "ADD FLAGS, #1"
         };
 
-        println!("{:?}", program);
+        println!("{program:?}");
 
         let mut mem = LinearMemory::new(1024);
         assert!(mem.write_program(&program));
@@ -913,7 +915,7 @@ mod test {
         assert_eq!(machine.registers[Register::A as usize], 34);
         assert_eq!(machine.registers[Register::B as usize], 55);
         assert_eq!(machine.registers[Register::M as usize], 9);
-        assert_eq!(machine.registers[Register::FLAGS as usize], 1) 
+        assert_eq!(machine.registers[Register::FLAGS as usize], 1); 
     }
 
     #[test]

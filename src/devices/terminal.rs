@@ -1,9 +1,8 @@
 use std::{
-    io::{Write, stdout, stdin},
-    usize,
+    io::{Write, stdout},
 };
 use crossterm::{
-    cursor, event::{read, Event, KeyCode}, execute, style::{self, Print, Stylize}, terminal::{self, Clear, ClearType}, ExecutableCommand, QueueableCommand
+    cursor, event::{read, Event, KeyCode}, style::{self}, terminal::{self, Clear, ClearType}, ExecutableCommand
 };
 
 use super::Device;
@@ -24,6 +23,12 @@ const TERM_CMD_SET_CURSOR: u8 = 0b100;
 
 const TERM_FLAG_READY: u8 = 0b1;
 const TERM_FLAG_ERROR: u8 = 0b10;
+
+/// Default base address where terminal-like devices are mapped.
+pub const DEFAULT_TERM_BASE: u16 = 0xF000;
+/// Default size of the terminal MMIO window: the 256-byte buffer plus the
+/// cursor, command and flags ports.
+pub const DEFAULT_TERM_SIZE: u16 = TERM_FLAGS as u16 + 1;
 
 pub enum TerminalAction {
     KeyPressed(char),
@@ -57,21 +62,24 @@ impl Terminal256 {
     pub fn read_from_stdin() -> std::io::Result<TerminalAction> {
         loop {
             // Blocks until an `Event` is available
-            match read()? {
-                Event::Key(event) => {
-                    return match event.code {
-                        KeyCode::Char(keyboard_key) => match keyboard_key {
-                            '0'..='9' => Ok(TerminalAction::NumberPressed(keyboard_key)),
-                            _ => Ok(TerminalAction::KeyPressed(keyboard_key)),
-                        }
-                        KeyCode::Backspace => Ok(TerminalAction::KeyPressedBackspace),
-                        KeyCode::Enter => Ok(TerminalAction::KeyPressedEnter),
-                        _ => Ok(TerminalAction::Unknown),
+            if let Event::Key(event) = read()? {
+                return match event.code {
+                    KeyCode::Char(keyboard_key) => match keyboard_key {
+                        '0'..='9' => Ok(TerminalAction::NumberPressed(keyboard_key)),
+                        _ => Ok(TerminalAction::KeyPressed(keyboard_key)),
                     }
-                },
-                _ => {} // Handle other event types if necessary
+                    KeyCode::Backspace => Ok(TerminalAction::KeyPressedBackspace),
+                    KeyCode::Enter => Ok(TerminalAction::KeyPressedEnter),
+                    _ => Ok(TerminalAction::Unknown),
+                };
             }
         }
+    }
+}
+
+impl Default for Terminal256 {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

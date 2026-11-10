@@ -1,0 +1,10 @@
+# clippy configuration knobs, read by `cargo clippy` from the package root.
+# reference: https://doc.rust-lang.org/clippy/configuration.html
+
+# the default (7) is tight for MMIO/builder APIs that legitimately take a
+# base address, a window size and per-field configuration
+too-many-arguments-threshold = 8
+
+# small helper functions in the VM core stay readable with a couple of
+# early returns; the default (7) is fine but this gives test helpers room
+cognitive-complexity-threshold = 15

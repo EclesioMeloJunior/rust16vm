@@ -67,6 +67,12 @@ impl DeviceBus {
     }
 }
 
+impl Default for DeviceBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct MemoryWithDevices {
     linear_memory: LinearMemory,
     device_bus: DeviceBus,

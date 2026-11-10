@@ -2,18 +2,70 @@
 name = "rust16vm"
 version = "0.1.0"
 edition = "2024"
+description = "A 16-bit virtual machine with 8 registers and memory-mapped terminal devices"
+license = "MIT"
+repository = "https://github.com/EclesioMeloJunior/rust16vm"
+keywords = ["vm", "emulator", "virtual-machine", "interpreter"]
+categories = ["emulators", "virtualization"]
 
 [dependencies]
 ratatui = { version = "0.29.0", features = ["unstable-widget-ref"] } 
 crossterm = "0.28.1"
 async-std = "1.13.0"
-futures = "0.3.31"
 crossbeam-channel = "0.5.14"
+clap = { version = "4", features = ["derive"] }
 
 [[bin]]
 name = "vm"
-path = "./bin/vm.rs"
+path = "./bin/vm/mod.rs"
 
 [[bin]]
 name = "asm"
 path = "./bin/asm.rs"
+
+# Lint policy applied to the library, both binaries and tests.
+# Groups run first (priority -1); specific lints below override them.
+[lints.clippy]
+# soundness and performance: never tolerate
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+
+# quality gates: surfaced as warnings, run ./scripts/clippy.sh to see them
+complexity = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+# individually requested lints
+redundant_clone = "warn"
+len_zero = "warn"
+too_many_arguments = "warn"
+
+# pedantic entries tuned down on purpose:
+# * doc requirements on every public function
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+# * the VM does intentional integer narrowing/widening all over (u16/u8/usize)
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+# * names like `Terminal256` inside the `terminal` module are fine
+module_name_repetitions = "allow"
+# * instruction bitfields group digits semantically (`0b00001000_0_000_0001`),
+#   so "readable" decimal-style digit grouping does not apply
+unreadable_literal = "allow"
+unusual_byte_groupings = "allow"
+# * `as` casts are the consistent idiom in the VM core (u8/u16/usize),
+#   switching some to From::from would make them the odd ones out
+cast_lossless = "allow"
+# * explicit `return` inside match/if branches is the prevailing style here,
+#   and rustfix applies this lint badly on multi-branch functions
+needless_return = "allow"
+# * the assembler API is internal; genericizing HashMap is not worth it
+implicit_hasher = "allow"
+# * supply-chain audit lints, not per-change quality gates (the async stack
+#   duplicates several crate versions)
+multiple_crate_versions = "allow"
